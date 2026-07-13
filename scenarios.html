@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#8f1d2c">
+  <meta name="description" content="Interactive ISO/IEC 42001 Lead Auditor case-study practice app with 12 scenarios and 60 linked questions.">
+  <title>ISO/IEC 42001 Scenario Case-Study Practice</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png">
+  <style>
+    :root{
+      --brand:#8f1d2c;--brand-dark:#651520;--brand-soft:#f8e9ec;
+      --ink:#17202e;--muted:#667085;--line:#d6dce5;--paper:#fff;--bg:#f2f4f7;
+      --success:#147a4b;--success-soft:#eaf7f0;--danger:#b42318;--danger-soft:#fef0ef;
+      --warn:#a15c00;--warn-soft:#fff4df;--blue:#175cd3;--blue-soft:#eff4ff;
+      --shadow:0 14px 36px rgba(16,24,40,.10);--radius:17px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.5}
+    button,input,select{font:inherit}
+    button{cursor:pointer}
+    .hidden{display:none!important}
+    .topbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+    .topbar-inner{max-width:1320px;margin:auto;padding:11px 18px;display:flex;align-items:center;gap:12px}
+    .mark{width:43px;height:43px;border-radius:12px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:850;font-size:12px;box-shadow:0 5px 17px rgba(143,29,44,.25)}
+    .brand-title{font-weight:850;font-size:17px;line-height:1.15}
+    .brand-sub{font-size:12px;color:var(--muted)}
+    .spacer{flex:1}
+    .header-stat{font-size:13px;color:var(--muted);padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:#f8fafc}
+    .container{max-width:1220px;margin:auto;padding:28px 18px 54px}
+    .hero{background:linear-gradient(135deg,#fff 0%,#fff 64%,#f8e7ea 100%);border:1px solid var(--line);border-radius:25px;padding:34px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+    .hero:after{content:"CASE";position:absolute;right:20px;bottom:-38px;font-size:132px;line-height:1;font-weight:900;color:rgba(143,29,44,.05);pointer-events:none}
+    .eyebrow{text-transform:uppercase;letter-spacing:.12em;color:var(--brand);font-size:12px;font-weight:850}
+    h1{font-size:clamp(31px,5vw,50px);line-height:1.06;margin:9px 0 13px;max-width:850px;letter-spacing:-.035em}
+    .lead{font-size:18px;color:#475467;max-width:850px;margin:0}
+    .notice{margin-top:18px;background:#fffbeb;border:1px solid #fedf89;color:#7a2e0e;padding:12px 14px;border-radius:12px;font-size:13px;max-width:900px}
+    .grid{display:grid;gap:20px}
+    .home-grid{grid-template-columns:minmax(0,1.45fr) minmax(295px,.8fr);margin-top:22px}
+    .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 4px 15px rgba(16,24,40,.05)}
+    .card-pad{padding:22px}
+    h2,h3{margin-top:0}
+    .section-title{font-size:20px;margin:0 0 16px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+    .field{display:flex;flex-direction:column;gap:7px}
+    .field.full{grid-column:1/-1}
+    label{font-size:13px;font-weight:750;color:#344054}
+    select,input[type="number"]{width:100%;border:1px solid #cbd2dc;background:#fff;border-radius:10px;padding:11px 12px;color:var(--ink);outline:none}
+    select:focus,input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(143,29,44,.12)}
+    .segmented{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .segmented button{border:1px solid var(--line);background:#fff;padding:10px;border-radius:10px;font-weight:780;color:#475467}
+    .segmented button.active{background:var(--brand-soft);border-color:#d58c98;color:var(--brand-dark)}
+    .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+    .toggle-row small{display:block;color:var(--muted);margin-top:2px}
+    .switch{position:relative;width:46px;height:26px;flex:none}
+    .switch input{opacity:0;width:0;height:0}
+    .slider{position:absolute;inset:0;background:#98a2b3;border-radius:999px;transition:.2s}
+    .slider:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.2)}
+    .switch input:checked+.slider{background:var(--brand)}
+    .switch input:checked+.slider:before{transform:translateX(20px)}
+    .btn{border:0;border-radius:11px;padding:12px 17px;font-weight:820;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:.15s}
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{background:var(--brand);color:#fff;box-shadow:0 6px 16px rgba(143,29,44,.22)}
+    .btn-primary:hover{background:var(--brand-dark)}
+    .btn-secondary{background:#fff;color:#344054;border:1px solid var(--line)}
+    .btn-ghost{background:transparent;color:#475467}
+    .btn-danger{background:var(--danger);color:#fff}
+    .btn-block{width:100%}
+    .actions{display:flex;flex-wrap:wrap;gap:9px}
+    .pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:820;background:#f2f4f7;color:#475467}
+    .pill.domain{background:var(--blue-soft);color:#1849a9}
+    .pill.flag{background:var(--warn-soft);color:var(--warn)}
+    .pill.success{background:var(--success-soft);color:var(--success)}
+    .pill.danger{background:var(--danger-soft);color:var(--danger)}
+    .history-item{padding:13px 0;border-bottom:1px solid #eaecf0}
+    .history-item:last-child{border-bottom:0}
+    .history-top{display:flex;justify-content:space-between;gap:10px;font-weight:750}
+    .history-meta{font-size:12px;color:var(--muted);margin-top:3px}
+    .empty{color:var(--muted);text-align:center;padding:22px}
+
+    .session-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
+    .scenario-card{padding:25px}
+    .scenario-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:15px}
+    .scenario-title{font-size:24px;line-height:1.25;margin:7px 0 0}
+    .scenario-copy{font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.72;color:#273142;background:#fbfcfd;border:1px solid #e4e7ec;border-left:4px solid var(--brand);padding:20px;border-radius:13px}
+    .scenario-copy p{margin:0 0 15px}
+    .scenario-copy p:last-child{margin-bottom:0}
+    .collapse-btn{white-space:nowrap}
+    .questions{display:grid;gap:17px;margin-top:20px}
+    .question-card{border:1px solid var(--line);border-radius:14px;padding:17px;background:#fff}
+    .question-card.answered{border-color:#b2ccff}
+    .question-card.correct{border-color:#80c9a5;background:#fbfffd}
+    .question-card.incorrect{border-color:#efa6a0;background:#fffdfd}
+    .q-kicker{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+    .q-num{font-size:13px;font-weight:850;color:var(--brand)}
+    .q-text{font-size:17px;font-weight:760;line-height:1.45;margin:0 0 13px}
+    .option-list{display:grid;gap:9px}
+    .option{width:100%;text-align:left;border:1px solid #cfd6e1;background:#fff;border-radius:11px;padding:12px;display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start;color:var(--ink)}
+    .option:hover{border-color:#b06a75;background:#fffafb}
+    .option .letter{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:#f2f4f7;color:#344054;font-weight:850}
+    .option.selected{border-color:var(--brand);background:var(--brand-soft);box-shadow:0 0 0 2px rgba(143,29,44,.08)}
+    .option.selected .letter{background:var(--brand);color:#fff}
+    .option.correct-answer{border-color:#42a876;background:var(--success-soft)}
+    .option.correct-answer .letter{background:var(--success);color:#fff}
+    .option.wrong-answer{border-color:#e08b84;background:var(--danger-soft)}
+    .option.wrong-answer .letter{background:var(--danger);color:#fff}
+    .option:disabled{cursor:default;opacity:1}
+    .feedback{margin-top:12px;padding:13px 14px;border-radius:11px;font-size:14px}
+    .feedback.good{background:var(--success-soft);border:1px solid #a6e0c2}
+    .feedback.bad{background:var(--danger-soft);border:1px solid #f3b9b5}
+    .feedback p{margin:6px 0}
+    .ref{font-size:12px;color:#475467;border-top:1px solid rgba(0,0,0,.08);padding-top:8px;margin-top:9px}
+    .scenario-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid #eaecf0}
+    .scenario-footer .group{display:flex;gap:9px;flex-wrap:wrap}
+    .side-card{position:sticky;top:82px;padding:18px}
+    .timer{font-variant-numeric:tabular-nums;font-size:21px;font-weight:860}
+    .timer.low{color:var(--danger)}
+    .progress-line{height:8px;background:#eaecf0;border-radius:999px;overflow:hidden;margin:10px 0 8px}
+    .progress-line span{display:block;height:100%;background:var(--brand);transition:width .2s}
+    .mini-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+    .mini-stat{background:#f8fafc;border:1px solid #eaecf0;border-radius:10px;padding:10px;text-align:center}
+    .mini-stat strong{display:block;font-size:18px}
+    .mini-stat small{color:var(--muted)}
+    .scenario-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;max-height:360px;overflow:auto}
+    .nav-s{height:43px;border-radius:9px;border:1px solid var(--line);background:#fff;color:#475467;font-weight:780;position:relative}
+    .nav-s.current{outline:2px solid var(--brand);outline-offset:1px;color:var(--brand)}
+    .nav-s.complete{background:#eef4ff;border-color:#b2ccff;color:#1849a9}
+    .nav-s.flagged:after{content:"";position:absolute;right:4px;top:4px;width:7px;height:7px;border-radius:50%;background:#f79009}
+    .mobile-nav-toggle{display:none}
+
+    .result-hero{display:grid;grid-template-columns:220px 1fr;gap:26px;align-items:center;padding:28px}
+    .score-ring{width:180px;height:180px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--brand) var(--score),#e4e7ec 0);position:relative;margin:auto}
+    .score-ring:before{content:"";position:absolute;inset:15px;background:#fff;border-radius:50%}
+    .score-ring .inside{position:relative;text-align:center}
+    .score-ring strong{font-size:39px;line-height:1}
+    .score-ring span{display:block;color:var(--muted);font-size:13px;margin-top:5px}
+    .domain-table{width:100%;border-collapse:collapse}
+    .domain-table th,.domain-table td{text-align:left;padding:11px 8px;border-bottom:1px solid #eaecf0;vertical-align:middle}
+    .domain-table th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+    .bar{height:8px;background:#eaecf0;border-radius:999px;overflow:hidden;min-width:100px}
+    .bar span{height:100%;display:block;background:var(--brand)}
+    .review-list{display:grid;gap:15px;margin-top:18px}
+    .review-card{padding:18px}
+    .review-card h4{margin:8px 0 12px;font-size:16px}
+    .review-scenario{font-family:Georgia,"Times New Roman",serif;font-size:14px;line-height:1.6;background:#f8fafc;border-left:3px solid var(--brand);padding:13px;border-radius:8px;margin:12px 0}
+    .review-answer{padding:10px 12px;border-radius:9px;background:#f8fafc;margin-top:8px;font-size:14px}
+    .review-answer.user-wrong{background:var(--danger-soft)}
+    .review-answer.correct-answer{background:var(--success-soft)}
+    .explanation{margin-top:13px;color:#344054;font-size:14px}
+    .explanation p{margin:7px 0}
+    .footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:28px}
+
+    @media(max-width:930px){
+      .home-grid,.session-layout,.result-hero{grid-template-columns:1fr}
+      .side-card{position:static}
+      .side-card.collapsed .scenario-nav,.side-card.collapsed .nav-extra{display:none}
+      .mobile-nav-toggle{display:inline-flex}
+      .score-ring{width:150px;height:150px}
+    }
+    @media(max-width:640px){
+      .container{padding:17px 11px 44px}
+      .hero{padding:24px 18px}
+      .hero:after{font-size:80px}
+      .form-grid{grid-template-columns:1fr}
+      .field.full{grid-column:auto}
+      .scenario-card{padding:17px}
+      .scenario-head{flex-direction:column}
+      .scenario-title{font-size:21px}
+      .scenario-copy{font-size:15px;padding:16px}
+      .q-text{font-size:16px}
+      .scenario-footer{align-items:stretch;flex-direction:column}
+      .scenario-footer .group{display:grid;grid-template-columns:1fr 1fr}
+      .scenario-footer .btn{width:100%}
+      .header-stat,.brand-sub{display:none}
+      .scenario-nav{grid-template-columns:repeat(6,1fr)}
+      .nav-s{height:38px;font-size:12px}
+      .result-hero{padding:20px}
+    }
+    @media print{
+      body{background:#fff}
+      .topbar,.no-print,.side-card,.scenario-footer,.actions{display:none!important}
+      .container{max-width:none;padding:0}
+      .card{box-shadow:none;border:0}
+      .review-card{break-inside:avoid}
+    }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="mark">AIMS</div>
+    <div>
+      <div class="brand-title">ISO/IEC 42001 Case-Study Practice</div>
+      <div class="brand-sub">12 scenarios • 60 linked questions • offline-ready</div>
+    </div>
+    <div class="spacer"></div>
+    <div id="headerStatus" class="header-stat">Set 4 scenario bank</div>
+    <button id="homeBtn" class="btn btn-ghost no-print">Home</button>
+  </div>
+</header>
+
+<main>
+<section id="homeScreen" class="container">
+  <div class="hero">
+    <div class="eyebrow">Multi-question scenario simulation</div>
+    <h1>Read the case, then apply the standard.</h1>
+    <p class="lead">Each case study contains one detailed organisational scenario followed by five linked questions, matching the format shown in your training material.</p>
+    <div class="notice"><strong>Study aid only.</strong> This is original practice material. It is not issued, endorsed or reviewed by PECB and does not contain official examination questions.</div>
+  </div>
+  <div class="grid home-grid">
+    <div class="card card-pad">
+      <h2 class="section-title">Start a case-study session</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label>Scenario order</label>
+          <div class="segmented" id="orderSeg">
+            <button type="button" data-value="domain" class="active">By domain</button>
+            <button type="button" data-value="shuffled">Shuffled</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Feedback mode</label>
+          <div class="segmented" id="modeSeg">
+            <button type="button" data-value="study" class="active">Study</button>
+            <button type="button" data-value="exam">Exam</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="scopeSelect">Scope</label>
+          <select id="scopeSelect">
+            <option value="all">All competency domains</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scenarioCount">Number of scenarios</label>
+          <select id="scenarioCount">
+            <option value="3">3 scenarios - 15 questions</option>
+            <option value="6">6 scenarios - 30 questions</option>
+            <option value="9">9 scenarios - 45 questions</option>
+            <option value="12" selected>12 scenarios - 60 questions</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="minutes">Time limit in minutes</label>
+          <input id="minutes" type="number" min="0" max="300" value="90">
+        </div>
+        <div class="field">
+          <label>Question-option handling</label>
+          <div class="toggle-row">
+            <div><strong>Randomise answer options</strong><small>Enabled automatically for shuffled mode</small></div>
+            <label class="switch"><input id="shuffleOptions" type="checkbox"><span class="slider"></span></label>
+          </div>
+        </div>
+        <div class="field full">
+          <button id="startBtn" class="btn btn-primary btn-block">Start case-study session</button>
+        </div>
+      </div>
+    </div>
+    <div class="card card-pad">
+      <h2 class="section-title">Recent results</h2>
+      <div id="history"></div>
+      <div class="actions" style="margin-top:12px">
+        <button id="clearHistoryBtn" class="btn btn-secondary">Clear history</button>
+      </div>
+    </div>
+  </div>
+  <div class="footer-note">Your progress and results remain in this browser. No data is uploaded.</div>
+</section>
+
+<section id="sessionScreen" class="container hidden">
+  <div class="session-layout">
+    <article class="card scenario-card">
+      <div class="scenario-head">
+        <div>
+          <div class="q-kicker">
+            <span id="scenarioNumber" class="pill"></span>
+            <span id="scenarioDomain" class="pill domain"></span>
+            <span id="scenarioFlag" class="pill flag hidden">Flagged</span>
+          </div>
+          <h2 id="scenarioTitle" class="scenario-title"></h2>
+        </div>
+        <button id="collapseScenarioBtn" class="btn btn-secondary collapse-btn no-print">Collapse scenario</button>
+      </div>
+      <div id="scenarioCopy" class="scenario-copy"></div>
+      <div id="questions" class="questions"></div>
+      <div class="scenario-footer no-print">
+        <div class="group">
+          <button id="prevBtn" class="btn btn-secondary">Previous</button>
+          <button id="flagBtn" class="btn btn-secondary">Flag scenario</button>
+        </div>
+        <div class="group">
+          <button id="submitScenarioBtn" class="btn btn-primary">Check scenario</button>
+          <button id="nextBtn" class="btn btn-primary">Next scenario</button>
+          <button id="finishBtn" class="btn btn-danger">Finish session</button>
+        </div>
+      </div>
+    </article>
+    <aside id="sideCard" class="card side-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <strong>Session progress</strong>
+        <button id="mobileNavToggle" class="btn btn-ghost mobile-nav-toggle">Show/hide</button>
+      </div>
+      <div id="timer" class="timer">90:00</div>
+      <div class="progress-line"><span id="progressBar" style="width:0%"></span></div>
+      <div id="progressText" style="font-size:12px;color:var(--muted);margin-bottom:12px"></div>
+      <div class="mini-stats">
+        <div class="mini-stat"><strong id="answeredCount">0</strong><small>answered</small></div>
+        <div class="mini-stat"><strong id="flaggedCount">0</strong><small>flagged</small></div>
+      </div>
+      <div id="scenarioNav" class="scenario-nav"></div>
+      <div class="nav-extra" style="margin-top:14px;font-size:12px;color:var(--muted)">
+        Keyboard: <b>1</b>, <b>2</b>, <b>3</b> choose an option for the focused question. <b>F</b> flags the scenario.
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section id="resultScreen" class="container hidden">
+  <div class="card result-hero">
+    <div id="scoreRing" class="score-ring" style="--score:0deg">
+      <div class="inside"><strong id="scorePercent">0%</strong><span id="scoreFraction"></span></div>
+    </div>
+    <div>
+      <div class="eyebrow">Session complete</div>
+      <h1 style="font-size:36px;margin:7px 0 10px">Case-study results</h1>
+      <p id="resultSummary" class="lead" style="font-size:16px"></p>
+      <div class="actions no-print" style="margin-top:16px">
+        <button id="reviewMissedBtn" class="btn btn-primary">Review missed questions</button>
+        <button id="retakeMissedBtn" class="btn btn-secondary">Retake missed scenarios</button>
+        <button id="printBtn" class="btn btn-secondary">Print results</button>
+        <button id="newSessionBtn" class="btn btn-secondary">New session</button>
+      </div>
+    </div>
+  </div>
+  <div class="card card-pad" style="margin-top:20px">
+    <h2 class="section-title">Domain performance</h2>
+    <table class="domain-table">
+      <thead><tr><th>Domain</th><th>Score</th><th>Performance</th></tr></thead>
+      <tbody id="domainRows"></tbody>
+    </table>
+  </div>
+  <div id="reviewSection" class="hidden" style="margin-top:20px">
+    <div class="card card-pad">
+      <h2 class="section-title">Detailed review</h2>
+      <div id="reviewList" class="review-list"></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script id="bankData" type="application/json">{"scenarios":[{"id":"S1","domain":1,"title":"MediPredict Clinical Decision Support","text":"MediPredict Australia develops a clinical decision-support platform used by hospitals to assist clinicians in identifying possible diagnoses, prioritising tests and suggesting treatment options. The platform processes structured patient observations, medical images and clinicians' notes. Its models are trained using historical cases where the diagnosis and treatment outcome are known. The models perform classification and regression, and they update their predictions when new patient data becomes available during an episode of care. The platform does not make a final clinical decision. A clinician must review the recommendation and can accept, reject or modify it.\n\nMediPredict is implementing an AI management system based on ISO/IEC 42001. Top management has approved a documented AI policy that is appropriate to the organisation's purpose, provides a framework for setting AI objectives, includes commitments to fulfil applicable requirements and continually improve the AIMS, is communicated internally and is available to relevant interested parties. The organisation has identified healthcare regulators, hospitals, clinicians, patients and its cloud provider as relevant interested parties.\n\nFor planning, MediPredict has determined risks and opportunities by considering the clinical domain, the intended use of the platform and its internal and external context. It has established risk criteria and has begun assessing model error, automation bias, privacy, cyber security and unequal performance across demographic groups. However, the project manager argues that a separate AI system impact assessment is unnecessary because the risk assessment already covers technical risks.","questions":[{"q":"Which type of machine learning is most clearly described by the training approach?","options":["Supervised machine learning","Unsupervised machine learning","Reinforcement learning"],"answer":0,"ref":"AI concepts: supervised learning","rationale":"The models are trained on historical cases with known diagnoses and outcomes, and perform classification and regression. That is characteristic of supervised learning."},{"q":"Which functional type of AI system best fits the platform's use of past cases and current patient data?","options":["Reactive machine","Limited-memory AI system","Self-aware AI system"],"answer":1,"ref":"AI concepts: functional types","rationale":"The platform uses historical experience and current observations to improve predictions. It is not purely reactive and there is no basis for self-awareness."},{"q":"Based on the scenario, does the AI policy meet the core requirements of ISO/IEC 42001 clause 5.2?","options":["Yes, the scenario describes the required policy commitments and controls over communication and availability","No, because the policy must list every AI objective in the policy itself","No, because the policy must remain confidential and unavailable to external interested parties"],"answer":0,"ref":"ISO/IEC 42001 clause 5.2","rationale":"The scenario covers appropriateness, a framework for objectives, commitments to applicable requirements and continual improvement, documentation, communication and availability. Objectives need not all be written into the policy itself."},{"q":"Has MediPredict used the correct considerations when determining AI risks and opportunities?","options":["Yes, because it considered the domain and application context, intended use, and internal and external context","No, because opportunities may only be determined after certification","No, because only financial risks are relevant to an AIMS"],"answer":0,"ref":"ISO/IEC 42001 clause 6.1.1","rationale":"Clause 6.1.1 requires risks and opportunities to be determined with regard to the domain and application context, intended use and the organisation's context."},{"q":"What is the best response to the project manager's view on impact assessment?","options":["Accept the view because a technical risk assessment always replaces an AI system impact assessment","Require an impact assessment process that considers consequences for individuals, groups and society, including intended use and foreseeable misuse, and feeds its results into risk assessment","Delay all impact consideration until after deployment when actual harm can be measured"],"answer":1,"ref":"ISO/IEC 42001 clauses 6.1.4 and 8.4; Annex A.5","rationale":"An AI system impact assessment has a distinct focus on consequences for individuals, groups and society. Its results are considered in the AI risk assessment. For clinical AI, this is particularly important."}]},{"id":"S2","domain":2,"title":"ClearLend Consumer Credit Platform","text":"ClearLend operates an AI-enabled consumer credit platform. The organisation develops the scoring model, operates the decision service and provides decisions to several banks. A specialist data company cleans and enriches applicant data before it is sent to ClearLend. ClearLend's proposed AIMS scope states: 'Development and operation of the credit scoring model at the Sydney office.' It excludes the data company on the basis that it is an external supplier and excludes the bank-facing support team because that team does not write model code.\n\nDuring implementation, the compliance manager identifies banks, applicants, regulators, consumer advocates, the data company and employees as interested parties. Applicable requirements include credit law, privacy obligations, contractual service levels, fairness commitments and requirements for adverse-action explanations. ClearLend has documented an AI objective to 'improve fairness'. The objective has no metric, owner, completion date or defined method for monitoring. The Head of Data Science says that the model team is responsible for the AIMS, while the support team believes compliance owns all AI-related responsibilities.\n\nThe organisation maintains a central document repository. Some AIMS procedures are approved and version-controlled, but locally saved copies remain in use and obsolete versions have not been withdrawn.","questions":[{"q":"What is the most significant concern with the proposed AIMS scope?","options":["It may omit activities and external interfaces that can affect the AIMS, including data preparation and customer-facing operation","It is invalid because an AIMS scope must include every office and every business process in the legal entity","It is invalid because suppliers can never be referenced in an AIMS scope"],"answer":0,"ref":"ISO/IEC 42001 clauses 4.3, 8.1 and Annex A.10","rationale":"The scope must consider relevant internal and external issues, interested-party requirements and interfaces. Outsourced processes and support activities that affect AI outcomes cannot simply be ignored because they are external or non-technical."},{"q":"Which action best addresses the interested-party analysis?","options":["Record only regulators because they are the only parties able to impose mandatory requirements","Determine which identified parties and requirements are relevant to the AIMS, and keep this information under review","Remove applicants because individual users are never interested parties under a management system standard"],"answer":1,"ref":"ISO/IEC 42001 clause 4.2","rationale":"The organisation must determine relevant interested parties and their relevant requirements, not merely list all possible parties or limit the analysis to regulators."},{"q":"What is missing from the objective to 'improve fairness'?","options":["Nothing, because qualitative AI objectives cannot be measured","Planning information such as a measurable outcome where practicable, responsibility, resources, time frame, evaluation method and retained documented information","A requirement that the objective be confidential from staff"],"answer":1,"ref":"ISO/IEC 42001 clause 6.2","rationale":"AI objectives must be consistent with the policy, measurable where practicable, monitored, communicated and updated, with planning for what will be done, resources, responsibility, timing and evaluation."},{"q":"What is the best auditor conclusion about AIMS roles and responsibilities?","options":["Roles appear unclear and inconsistently understood, so the auditor should seek documented assignments and corroborating interviews","The Head of Data Science automatically owns every AIMS responsibility because the system is technical","The compliance manager automatically owns every AIMS responsibility because laws are involved"],"answer":0,"ref":"ISO/IEC 42001 clause 5.3; Annex A.3","rationale":"Responsibilities and authorities must be assigned, communicated and understood. Conflicting accounts indicate the need for further evidence and may reveal a nonconformity."},{"q":"Which documented-information control is most clearly ineffective?","options":["The organisation has too many approved procedures","Obsolete and uncontrolled local copies remain available for use","All documents must be stored only in hard copy"],"answer":1,"ref":"ISO/IEC 42001 clause 7.5.3","rationale":"Documented information must be controlled for distribution, access, change, retention and disposition. Continued use of obsolete local copies undermines control."}]},{"id":"S3","domain":2,"title":"CityFlow Traffic Optimisation","text":"CityFlow manages an AI system that optimises traffic signals and recommends road closures during major events. The AIMS risk assessment method assigns consequences and likelihood, produces a risk level and compares the result with approved risk criteria. Repeated assessments are designed to generate comparable results. The latest assessment considers public safety, emergency-vehicle access, unequal effects on neighbourhoods, cyber attack, sensor failure and model drift.\n\nThe risk treatment team selected controls from Annex A and added controls from the city's safety management system. The Statement of Applicability lists the selected controls and their implementation status. It provides reasons for including controls, but it does not justify exclusions. The team leader argues that any Annex A control not selected is automatically 'not applicable' and needs no explanation. The risk treatment plan has been approved by the system owner, but acceptance of residual safety risk has not been approved by designated management.\n\nAn impact assessment was performed before pilot deployment. It examined effects on commuters, residents, emergency services and people with disability, including foreseeable misuse of the road-closure recommendation. The results were documented, but the risk team did not use the impact findings when updating the AI risk assessment.","questions":[{"q":"Which statement best describes the design of CityFlow's AI risk assessment process?","options":["It broadly reflects the required steps because it addresses consequences, likelihood where applicable, risk levels and comparison with risk criteria","It is invalid because ISO/IEC 42001 prohibits the use of likelihood","It is sufficient only if every risk receives the same rating"],"answer":0,"ref":"ISO/IEC 42001 clause 6.1.2","rationale":"The described process aligns with the required analysis and evaluation steps and is designed for consistent, valid and comparable results."},{"q":"What is the deficiency in the Statement of Applicability?","options":["It includes additional controls from another management system","It does not justify exclusions as well as inclusions","It identifies implementation status"],"answer":1,"ref":"ISO/IEC 42001 clause 6.1.3(f)","rationale":"The Statement of Applicability must contain necessary controls and provide justification for inclusion and exclusion. Annex A is a reference set, not an automatic all-or-nothing checklist."},{"q":"Is the team leader correct that unselected Annex A controls need no explanation?","options":["Yes, because Annex A controls are prohibited unless required by law","No, because exclusions must be justified, while additional controls may also be necessary","Yes, because the Statement of Applicability only records implemented controls"],"answer":1,"ref":"ISO/IEC 42001 clause 6.1.3; Annex A notes","rationale":"The organisation must compare necessary controls with Annex A, consider relevant controls and justify exclusions. It may also design or source additional controls."},{"q":"What approval is missing from the risk treatment process?","options":["Approval by every interested party","Approval by designated management for the treatment plan and acceptance of residual AI risk","Approval by the external auditor before implementation"],"answer":1,"ref":"ISO/IEC 42001 clause 6.1.3","rationale":"Designated management must approve the AI risk treatment plan and acceptance of residual AI risks."},{"q":"What should CityFlow do with the impact assessment results?","options":["Archive them separately because impact assessment must remain independent of risk management","Consider them in the AI risk assessment and resulting treatment decisions","Provide them only to the model developer and not the risk team"],"answer":1,"ref":"ISO/IEC 42001 clause 6.1.4","rationale":"The standard requires the organisation to consider AI system impact assessment results in the AI risk assessment."}]},{"id":"S4","domain":2,"title":"RecruitRight Candidate Screening","text":"RecruitRight provides an AI system that ranks candidates for entry-level roles. It uses resumes, application responses and online assessment results. A supplier provides a pre-trained language model and another supplier provides demographic benchmarking data. RecruitRight has documented data sources and quantities, but the records do not show data transformations, lineage or criteria for excluding records. The data-quality report measures completeness but does not assess representativeness or potential bias.\n\nThe organisation performed an impact assessment. It considered privacy and security but did not consider whether the ranking process might disadvantage groups of candidates, whether historical recruitment decisions could reproduce past discrimination, or the consequences of foreseeable misuse by hiring managers. Recruiters receive a numerical ranking without information about limitations, assumptions or appropriate human review. Candidates are not told that an AI system contributes to ranking and have no channel to report suspected unfair outcomes.\n\nThe contract with the language-model supplier contains general confidentiality terms. It does not allocate responsibility for model updates, validation evidence, incident notification, technical documentation or changes that could affect the intended use.","questions":[{"q":"Which data governance evidence is most clearly missing?","options":["Data provenance and preparation records that support traceability of transformations and selection decisions","A requirement to delete all data immediately after model training","A guarantee that no external data can ever be used"],"answer":0,"ref":"Annex A.7 Data for AI systems","rationale":"AI data controls include acquisition, quality, provenance and preparation. Lineage and transformation records are needed to support traceability and evaluation."},{"q":"What is the key weakness in the data-quality evaluation?","options":["It considers completeness","It does not evaluate representativeness and bias relevant to the intended use","It uses a written report rather than an interview"],"answer":1,"ref":"Annex A.7 Data quality","rationale":"For recruitment ranking, representativeness and bias are material data-quality characteristics. Completeness alone is not sufficient."},{"q":"What is the most significant weakness in the impact assessment?","options":["It did not examine potential effects on individuals and groups, historical bias or foreseeable misuse","It considered privacy and security","It was performed before the external certification audit"],"answer":0,"ref":"ISO/IEC 42001 clause 6.1.4; Annex A.5","rationale":"The impact assessment should address consequences for individuals and groups, the technical and societal context, intended use and foreseeable misuse."},{"q":"Which control area is most directly implicated by the lack of information to recruiters and candidates?","options":["Information for interested parties and responsible use of AI systems","Office building maintenance","Financial accounting controls"],"answer":0,"ref":"Annex A.8 and A.9","rationale":"Users need appropriate system information, limitations and usage guidance. Affected external parties also need suitable information and reporting channels where relevant."},{"q":"What should the supplier contract address more explicitly?","options":["Only the supplier's marketing obligations","Allocation of AI lifecycle responsibilities, change notification, validation evidence, incident handling and required technical information","A transfer of all AIMS accountability to the supplier"],"answer":1,"ref":"Annex A.10 Third-party and customer relationships","rationale":"The organisation retains accountability but should clearly allocate responsibilities and establish supplier controls, documentation and communication requirements."}]},{"id":"S5","domain":3,"title":"AgriVision Evidence and Auditor Conduct","text":"AgriVision uses computer vision to detect crop disease from drone images. During a certification audit, the auditor interviews the operations manager, who says that model-performance alerts are reviewed every day. No review records are immediately available. A dashboard shows that alerts exist, but it does not show who reviewed them or what action was taken. The auditor plans to interview two operators, inspect alert logs and select a sample of high-severity events.\n\nOne audit team member previously designed AgriVision's model-monitoring process as a consultant. The team member says this is helpful because they know where weaknesses are likely to exist. The audit team leader is also offered free accommodation at the farm owner's holiday property after the audit.\n\nAgriVision operates three farms. The largest farm uses a new model version, has recently replaced its drone supplier and recorded two major performance incidents. The other farms use the older model and have stable operations. The audit plan originally allocates equal sampling time to each farm. During the remote portion of the audit, a network outage prevents the team from viewing original event logs. The auditee provides screenshots selected by the operations manager.","questions":[{"q":"How should the auditor treat the operations manager's statement that alerts are reviewed daily?","options":["Accept it as conclusive evidence because managers are authoritative","Treat it as verbal evidence and corroborate it with records, observation and sampling","Reject it automatically because verbal evidence can never be used"],"answer":1,"ref":"Evidence-based auditing; evidence reliability","rationale":"Verbal evidence is useful but generally less reliable and should be corroborated, especially where records should exist."},{"q":"What is the most appropriate response to the team member who designed the monitoring process?","options":["Assign that person to audit their own design because familiarity improves efficiency","Evaluate the threat to independence and remove or reassign the person from auditing work for which they were responsible","Ignore the issue if the auditee does not complain"],"answer":1,"ref":"ISO 19011 principle of independence; impartiality","rationale":"Auditors should be independent of the activity being audited where practicable. Prior responsibility creates a self-review threat that must be managed."},{"q":"How should the audit team leader respond to the offer of free accommodation?","options":["Accept it because it is offered after fieldwork","Decline and follow the certification body's impartiality and gifts policy","Accept it if the value is not disclosed in the audit report"],"answer":1,"ref":"Integrity, independence and impartiality","rationale":"Accepting a personal benefit from the auditee could create or appear to create bias and compromise integrity and impartiality."},{"q":"What is the best sampling approach for the three farms?","options":["Allocate equal time regardless of change, incidents or complexity","Use risk-based and judgement-based sampling, placing greater emphasis on the changed, incident-affected farm while maintaining adequate coverage","Audit only the smallest farm because it will take less time"],"answer":1,"ref":"ISO 19011 sampling and risk-based approach","rationale":"Sampling should consider change, complexity, prior incidents and significant risks. Equal allocation would not reflect the audit risk."},{"q":"What should the team do when original logs cannot be accessed and only management-selected screenshots are available?","options":["Raise a major nonconformity immediately because any network outage proves system failure","Assess whether alternative evidence is sufficient and reliable, record the limitation, and reschedule or extend testing if necessary","Assume conformity because no contrary evidence is visible"],"answer":1,"ref":"Evidence sufficiency, reliability and audit limitations","rationale":"The auditor must evaluate sufficiency and reliability. Selected screenshots may be inadequate. A limitation may require alternative procedures, revised timing or qualification of conclusions, but it does not automatically prove nonconformity."}]},{"id":"S6","domain":4,"title":"CareCompanion Stage 1 Readiness","text":"CareCompanion operates conversational AI for residential aged-care facilities. A certification body begins the Stage 1 audit. The AIMS scope, AI policy, risk assessment method and high-level process descriptions are available. However, the organisation has not completed an internal audit or management review. Its impact assessment template exists, but no assessment has been completed for the deployed system. The risk treatment plan is in draft and the Statement of Applicability does not identify implementation status.\n\nThe organisation wants Stage 2 to begin the following week because a major customer requires certification. Senior management asks the audit team to use Stage 1 to confirm that staff follow procedures and that controls are effective. The audit team interviews the AIMS manager, a top-management representative and the internal-audit coordinator. The purpose is to understand the organisation's context, readiness, planned arrangements and site-specific conditions.\n\nCareCompanion stores most documented information in a cloud repository. The auditee grants the audit team read-only access but has not explained the repository structure, search functions or how confidential resident information will be protected during remote review.","questions":[{"q":"What is the primary purpose of Stage 1 in this scenario?","options":["To verify the design and readiness of the AIMS, review documented information and plan Stage 2","To complete all effectiveness testing and issue the certification decision","To replace the organisation's internal audit"],"answer":0,"ref":"ISO/IEC 17021-1 Stage 1 objectives","rationale":"Stage 1 focuses on documented information, site conditions, scope, readiness and planning. Effectiveness is primarily assessed at Stage 2."},{"q":"How should the auditor respond to management's request to confirm operating effectiveness during Stage 1?","options":["Explain that Stage 1 may gather understanding, but effectiveness testing is principally a Stage 2 objective","Agree because Stage 1 and Stage 2 have identical objectives","Refuse to interview any personnel during Stage 1"],"answer":0,"ref":"Stage 1 versus Stage 2","rationale":"Interviews and observations may support understanding at Stage 1, but Stage 1 does not ordinarily validate full implementation and effectiveness."},{"q":"What is the best readiness conclusion given the missing internal audit, management review and completed impact assessment?","options":["Proceed automatically because customer deadlines override certification requirements","Treat the gaps as significant readiness concerns, document them and determine whether Stage 2 should be postponed until they are addressed","Issue certification at the end of Stage 1"],"answer":1,"ref":"ISO/IEC 17021-1 Stage 1 readiness review","rationale":"The auditor must evaluate whether implementation is sufficiently advanced for Stage 2. Missing core evaluation activities and impact assessment can justify postponement."},{"q":"Why are the selected Stage 1 interviews appropriate?","options":["They help the team understand context, management commitment, internal audit arrangements and readiness","They provide automatic proof of conformity for every clause","They allow the auditor to design the organisation's AIMS"],"answer":0,"ref":"Stage 1 interviews","rationale":"Stage 1 interviews support understanding and readiness assessment. They do not replace evidence of implementation or permit consultancy."},{"q":"What should be agreed regarding the cloud repository before further review?","options":["How auditors will access and navigate it, protect confidential information and obtain reliable evidence","That the auditor may copy all resident records to a personal device","That only screenshots selected by management will be accepted"],"answer":0,"ref":"Electronic documented information and confidentiality","rationale":"The parties should agree secure access, navigation and handling arrangements so the auditor can use the system effectively without compromising confidentiality."}]},{"id":"S7","domain":5,"title":"SafeRoute Stage 2 Audit Trail","text":"SafeRoute uses AI to optimise delivery routes and predict driver fatigue risk. During the Stage 2 opening meeting, the audit team confirms the scope, plan, communication channels, confidentiality arrangements and method for reporting findings. The operations director objects to an interview with night-shift dispatchers because they are busy. The audit team leader explains that their availability was agreed in the audit plan.\n\nThe documented procedure requires fatigue alerts rated 'critical' to be reviewed by a trained supervisor within 15 minutes. A dashboard summary reports 98 per cent compliance. The auditor selects 25 critical alerts across different sites and shifts. Six records have no evidence of review within 15 minutes. The operations director says supervisors often review alerts by telephone without recording the action. Interviews with two dispatchers indicate that, during staff shortages, critical alerts are sometimes cleared by untrained coordinators.\n\nThe auditor follows the trail into competence records, shift rosters, alert configuration, incident logs and corrective actions. A technical expert assists with validating how timestamps are generated. The auditee then provides a revised spreadsheet stating that three of the six records were reviewed on time, but the spreadsheet was created that morning and is not linked to original system logs.","questions":[{"q":"What should the audit team leader do about the operations director's objection to dispatcher interviews?","options":["Cancel the interviews because auditee management controls all evidence selection","Seek to resolve the objection against the agreed audit plan and preserve access to necessary personnel, escalating through agreed channels if unresolved","Immediately terminate the audit without discussion"],"answer":1,"ref":"Communication and management of the audit plan","rationale":"Objections should be resolved by the audit team leader and auditee. The team must retain sufficient access to planned evidence and personnel."},{"q":"Why is the auditor's sample stronger than relying only on the 98 per cent dashboard?","options":["It tests underlying records across sites and shifts and can reveal whether the summary is complete and reliable","Dashboards are never admissible as audit evidence","A sample automatically proves every transaction conforms"],"answer":0,"ref":"Sampling and audit trail","rationale":"Testing source records and tracing them across processes provides more reliable evidence than accepting a management summary at face value."},{"q":"What is the best next step after learning that untrained coordinators sometimes clear critical alerts?","options":["Stop at the interview because verbal evidence is sufficient for a major nonconformity","Corroborate the statement through rosters, access logs, competence records and specific alert cases, then evaluate the requirement and systemic extent","Ask the auditor to train the coordinators during the audit"],"answer":1,"ref":"Evidence-based auditing and competence","rationale":"The statement is a lead that should be corroborated. The auditor should establish factual evidence, criteria and extent before classifying a finding."},{"q":"How should the auditor treat the newly created spreadsheet?","options":["Accept it automatically because it was provided by a director","Evaluate its source, integrity and traceability, and seek corroboration from original logs or other reliable evidence","Reject all spreadsheets as invalid evidence"],"answer":1,"ref":"Evidence reliability and documented information","rationale":"A newly created, unlinked spreadsheet may be less reliable. The auditor should test provenance and corroborate it rather than automatically accept or reject it."},{"q":"What is the technical expert's proper role?","options":["Assist the audit team with specialist understanding while the auditors retain responsibility for findings and conclusions","Make the certification decision independently","Design a replacement alert system for the auditee"],"answer":0,"ref":"Use of technical experts in audits","rationale":"A technical expert provides specific knowledge under the direction of an auditor. Audit responsibility remains with the audit team."}]},{"id":"S8","domain":5,"title":"PublicAssist Benefits Triage","text":"PublicAssist is a government agency using AI to prioritise benefit applications for manual review. The system does not approve or reject applications, but high-risk scores can delay processing. The approved use procedure requires trained officers to review the score, consider specified contextual factors and record reasons when the recommendation influences prioritisation.\n\nDuring the audit, the team observes that officers frequently accept the score without documenting contextual review. Some officers use the system to identify suspected fraud, although fraud investigation is outside the approved intended use. The user guide explains the score but does not describe known limitations, groups for whom performance is weaker or circumstances requiring override. Applicants are told that automated tools support administration, but there is no accessible channel for reporting suspected adverse effects or requesting review of AI-related processing.\n\nA recent model update changed the feature set. The change was technically tested, but the agency did not repeat the impact assessment or evaluate whether the update altered risks to applicants. A performance incident affecting a regional community was discussed internally, but no assessment was made of notification obligations to regulators or affected parties.","questions":[{"q":"What does the observed failure to record contextual review most directly indicate?","options":["Possible ineffective implementation of the organisation's responsible-use and human-oversight controls","Proof that human oversight is never needed","A requirement to remove all officers from the process"],"answer":0,"ref":"Annex A.9 Responsible use; operational control","rationale":"The organisation defined human review and documentation as operational controls. Repeated failure to apply them indicates a potential implementation and effectiveness issue."},{"q":"How should the auditor treat use of the system for fraud identification?","options":["As a potential deviation from intended use requiring evidence of authorisation, risk assessment, impact consideration and control","As automatically acceptable because fraud prevention is beneficial","As irrelevant because auditors may only examine model code"],"answer":0,"ref":"Intended use, operational planning and Annex A.9","rationale":"Use outside the approved purpose can materially change risks and impacts. It should be controlled and assessed, not assumed acceptable."},{"q":"Which control weakness is reflected in the user guide?","options":["It lacks information about limitations and appropriate use needed by users","It contains too much information about the score","It is not printed on paper"],"answer":0,"ref":"Annex A.8.2 System documentation and information for users","rationale":"Users need information sufficient for proper and responsible operation, including limitations, assumptions and circumstances requiring human action."},{"q":"What should have been considered after the model update?","options":["Whether the change required renewed risk and impact assessment and updated controls before or during deployment","Only whether the code compiled successfully","Whether certification could be transferred to the software vendor"],"answer":0,"ref":"ISO/IEC 42001 clauses 6.3, 8.1, 8.2 and 8.4","rationale":"Significant changes should be planned and controlled. Risk and impact assessments should be performed at planned intervals and when significant changes occur."},{"q":"What is the best audit focus for the incident affecting a regional community?","options":["Whether the incident was logged, investigated, escalated, used to update risk and impact assessments, and communicated according to applicable obligations","Whether the agency removed all records of the incident","Whether the auditor agrees with the agency's public relations wording"],"answer":0,"ref":"Annex A.8 reporting and communication; clauses 9.1 and 10.2","rationale":"The audit should test the established incident, evaluation, reporting and improvement processes against applicable obligations and internal requirements."}]},{"id":"S9","domain":5,"title":"MedSupply Third-Party AI Procurement","text":"MedSupply purchases an AI forecasting service that predicts demand for critical medicines. The provider hosts the model and supplies weekly forecasts. MedSupply's procurement evaluation focused on price, uptime and cyber security. It did not assess the provider's data governance, validation approach, responsible-AI controls or ability to explain material model changes.\n\nThe contract states that the provider is responsible for 'the AI service' and MedSupply is responsible for 'business use'. It does not allocate responsibility for data quality, impact assessment inputs, monitoring, incident reporting, model updates, technical documentation or regulatory cooperation. When the provider changed its model architecture, forecast error increased for remote hospitals. MedSupply learned of the change after users complained.\n\nThe provider supplies a two-page product description but refuses to provide validation evidence, limitations or information about training-data categories, citing intellectual property. MedSupply nevertheless continues to rely on the forecasts and has not established alternative monitoring or escalation controls. Customers receive forecasts without guidance on confidence, limitations or appropriate human review.","questions":[{"q":"What is the primary weakness in supplier selection?","options":["The evaluation did not include AI-specific governance, data, validation and responsible-use criteria relevant to the service","The supplier was selected using a written process","The supplier hosts the model externally"],"answer":0,"ref":"Annex A.10 Supplier processes","rationale":"Supplier selection should address responsible AI, data, security, compliance and capability requirements relevant to the AI lifecycle and intended use."},{"q":"What is wrong with the contract's broad allocation of responsibility?","options":["It is too detailed","It does not clearly allocate material AI lifecycle responsibilities and communication duties between the parties","It makes MedSupply responsible for business use"],"answer":1,"ref":"Annex A.10.2 Allocation of responsibilities","rationale":"Clear accountability and communication channels are needed across the AI system lifecycle. Broad labels do not adequately address specific obligations."},{"q":"How should the model architecture change have been controlled?","options":["Through agreed change notification, evaluation of impact and risk, validation, acceptance criteria and communication before reliance on the changed service","The provider may change anything without notice because it owns the model","Only by updating the invoice"],"answer":0,"ref":"Annex A.10; clauses 6.3 and 8.1","rationale":"Supplier changes that can affect intended use or performance should be notified, evaluated and controlled under contractual and operational arrangements."},{"q":"What should the auditor conclude about the provider's refusal to supply sufficient technical information?","options":["Intellectual property automatically removes MedSupply's responsibility to obtain adequate evidence","MedSupply must determine what information is necessary for governance and safe use, and address the evidence gap through contractual, technical or alternative controls","The auditor should demand the provider's entire source code in every case"],"answer":1,"ref":"Annex A.6.2.7, A.8 and A.10","rationale":"The organisation should obtain necessary technical and user information appropriate to interested parties. It need not always obtain source code, but it cannot ignore a material evidence gap."},{"q":"Which customer-facing control is most clearly missing?","options":["Information about forecast confidence, limitations and appropriate human review","A promise that forecasts are always correct","A requirement that customers build their own model"],"answer":0,"ref":"Annex A.8 Information for interested parties","rationale":"Users need sufficient information to interpret and use AI outputs responsibly, including limitations and oversight expectations."}]},{"id":"S10","domain":6,"title":"InsureSense Audit Findings and Closing Meeting","text":"InsureSense uses AI to estimate motor-vehicle repair costs. During Stage 2, the audit team finds that the organisation's procedure requires an AI system impact assessment before deployment and after any significant change. Four production models have been deployed. No impact assessment exists for three models, including a recently changed model used nationally. Interviews show that teams believed the risk register was sufficient and no one was assigned responsibility for impact assessment. The issue has persisted across two internal audits, where it was recorded as an observation but not corrected.\n\nThe audit team has objective evidence, identifies the applicable requirement and concludes that the failure is systemic and affects the AIMS's capability to achieve intended results. Management asks the team to classify the issue as minor because no proven customer harm has occurred. It also asks the lead auditor to recommend a specific consulting firm and provide a template that will guarantee closure.\n\nBefore the closing meeting, management produces one impact assessment completed that afternoon for the recently changed model. It does not address foreseeable misuse or affected groups and has not been incorporated into risk assessment. Management argues that this new document eliminates the finding.","questions":[{"q":"Which classification is best supported by the scenario?","options":["Major nonconformity, because the absence is systemic, affects multiple production models and undermines the management system's capability","Minor nonconformity solely because no harm has yet been proven","Conformity because a risk register exists"],"answer":0,"ref":"ISO/IEC 17021-1 definition of major nonconformity","rationale":"A major nonconformity affects the capability of the management system to achieve intended results. The systemic absence across production models, unclear responsibility and repeated failure support major classification."},{"q":"Which elements must the nonconformity report clearly contain?","options":["Audit criteria, objective evidence supporting the finding, a clear statement of nonfulfilment and classification","Only the auditor's opinion and a proposed solution","Only the clause number"],"answer":0,"ref":"ISO 19011 Annex A.18; nonconformity reporting","rationale":"A defensible NCR links specific criteria to factual evidence and a clear declaration of nonconformity, with classification under the audit scheme."},{"q":"How should the auditor respond to the request for a specific consulting firm and guaranteed template?","options":["Provide both to help the client close the issue quickly","Explain the requirement and expected outcome without prescribing a specific solution or supplier","Reduce the finding if management accepts the auditor's preferred supplier"],"answer":1,"ref":"Auditor independence and avoiding consultancy","rationale":"Auditors may clarify requirements but should not design the client's solution or recommend a provider in a way that compromises impartiality."},{"q":"Does the newly created impact assessment automatically eliminate the finding?","options":["Yes, because any document created before the closing meeting proves conformity","No, the auditor must evaluate its completeness, implementation and integration, and the systemic evidence may remain","Yes, because management says the document is final"],"answer":1,"ref":"Evidence evaluation and new evidence","rationale":"New evidence may change a conclusion only if it demonstrates fulfilment. An incomplete, last-minute document for one model does not resolve the systemic failure."},{"q":"What should the lead auditor do at the closing meeting if management continues to disagree?","options":["Negotiate the classification until management is satisfied","Present the evidence, criteria, finding and conclusions clearly, explain the process for response or appeal, and change the conclusion only if valid new evidence warrants it","Delete the finding to preserve the customer relationship"],"answer":1,"ref":"Closing meeting and fair presentation","rationale":"The auditor should fairly present conclusions and explain next steps. Conclusions are not negotiated, although valid new evidence must be considered."}]},{"id":"S11","domain":6,"title":"EduGen Corrective Action and Follow-up","text":"EduGen provides generative AI tools to schools. A certification audit raised a major nonconformity because the organisation had no effective process for evaluating harmful outputs reported by schools. EduGen immediately disabled one high-risk feature and manually reviewed open complaints. Its cause analysis states: 'staff did not follow the process'. The proposed corrective action is to remind staff by email and close the issue within two weeks.\n\nThe auditor's review shows that the process was never assigned to an owner, the complaint system did not route AI issues to the safety team, service-level targets were undefined and no monitoring report existed. EduGen then proposes a revised plan: assign ownership, modify routing rules, establish response criteria and time frames, train relevant staff, retrospectively review complaints, update risk and impact assessments and monitor effectiveness for three months.\n\nAt follow-up, the organisation provides revised procedures, system configuration evidence, training records, a sample of handled complaints and trend reports. Two sampled cases exceeded the new target but were escalated and analysed. The auditor must decide whether correction and corrective action have been implemented and whether they are effective enough to close the major nonconformity.","questions":[{"q":"Which action in the first paragraph is a correction rather than corrective action?","options":["Disabling the high-risk feature and reviewing open complaints to control the immediate issue","Changing routing rules based on cause analysis","Establishing ongoing performance monitoring"],"answer":0,"ref":"ISO/IEC 42001 clause 10.2","rationale":"A correction addresses the detected nonconformity and immediate consequences. Corrective action addresses causes to prevent recurrence."},{"q":"Why is the initial cause analysis inadequate?","options":["It stops at staff behaviour and does not examine systemic causes such as ownership, workflow design, targets and monitoring","Cause analysis is never required for a major nonconformity","It contains too many technical details"],"answer":0,"ref":"Cause analysis and corrective action","rationale":"'Staff did not follow the process' is superficial when the process itself lacked ownership, routing and monitoring. Effective cause analysis should identify underlying system causes."},{"q":"Which proposed plan best addresses recurrence?","options":["The email reminder alone","The revised plan addressing ownership, routing, criteria, competence, retrospective review, risk and impact updates, and effectiveness monitoring","Waiting for another school complaint before acting"],"answer":1,"ref":"ISO/IEC 42001 clause 10.2","rationale":"The revised plan addresses identified causes, consequences and system controls and includes a basis for evaluating effectiveness."},{"q":"What evidence is most useful at follow-up?","options":["Only the revised procedure","A combination of implemented configuration, competence records, handled cases, trend data and evidence that actions address the causes","A verbal promise from the chief executive"],"answer":1,"ref":"Audit follow-up and effectiveness verification","rationale":"Closure requires evidence of implementation and effectiveness, not merely revised documentation."},{"q":"How should the auditor treat the two late cases?","options":["Automatically keep the major nonconformity open because any exception proves total failure","Evaluate the context, extent, escalation and trend to determine whether the process is implemented and effective, and whether residual issues justify a separate or continuing finding","Ignore them because the procedure has been approved"],"answer":1,"ref":"Professional judgement and sufficiency of corrective action","rationale":"Effectiveness is evaluated using context and evidence. Isolated exceptions do not automatically prove systemic failure, but they must be analysed and may affect closure."}]},{"id":"S12","domain":7,"title":"GlobalAI Group Audit Programme","text":"GlobalAI Group operates an AIMS across six countries and twelve business units. The internal audit manager prepares a three-year programme that audits every unit for the same duration once every three years. The schedule does not consider risk level, previous findings, regulatory change, significant model releases, incidents or changes in suppliers. Two high-impact business units introduced new AI systems this year, while three low-impact units have stable processes and strong prior results.\n\nThe internal audit team includes privacy, safety, data science and management-system auditors. One data-science auditor is assigned to audit the model-governance process they manage in their day job. Another auditor is competent in ISO 19011 but has limited knowledge of AI risks and the applicable sector. The programme has no defined competence criteria for audit team leaders or technical experts.\n\nSenior management asks the internal audit manager to report only the number of completed audits. There are no programme objectives linked to AIMS priorities, no analysis of recurring findings, no monitoring of auditor performance and no review of whether audit results lead to corrective action and improvement. The company plans to use remote methods for several locations but has not assessed technology, confidentiality, time zones or access to local personnel.","questions":[{"q":"What is the main weakness in the three-year schedule?","options":["It does not use a risk-based approach to determine priorities, frequency, methods and duration","It includes more than one country","It is documented"],"answer":0,"ref":"ISO 19011 management of an audit programme; risk-based approach","rationale":"An audit programme should consider objectives, risks, changes, previous performance and significance. Equal frequency and duration may not provide effective coverage."},{"q":"How should the two high-impact units be treated?","options":["Give them priority or increased audit coverage because of significant new systems and risk","Exclude them until the next three-year cycle","Audit them only if they volunteer"],"answer":0,"ref":"Audit programme priorities","rationale":"New high-impact systems and change increase audit risk and justify earlier or deeper coverage."},{"q":"What is the independence issue with the data-science auditor?","options":["They would be auditing a process they manage, creating a self-review threat that should be avoided or mitigated","Technical staff may never participate in audits","There is no issue if they are experienced"],"answer":0,"ref":"ISO 19011 independence and impartiality","rationale":"Auditing one's own work undermines objectivity. The programme manager should reassign the work or establish safeguards."},{"q":"What should the programme establish regarding competence?","options":["Defined competence criteria, evaluation and development for auditors, team leaders and technical experts based on the audit scope and risks","A rule that all auditors must have identical technical qualifications","No criteria because professional judgement cannot be evaluated"],"answer":0,"ref":"ISO 19011 auditor competence and evaluation","rationale":"Competence needs vary by role and audit context. The programme should determine, evaluate, maintain and improve required competence."},{"q":"Which performance information would provide the strongest programme oversight?","options":["Completed-audit count only","Achievement of programme objectives, coverage of significant risks, recurring findings, timeliness and effectiveness of corrective action, auditor performance and improvement opportunities","The number of pages in each audit report"],"answer":1,"ref":"Monitoring and reviewing the audit programme","rationale":"Programme oversight should assess effectiveness and contribution to AIMS performance, not merely activity volume. Remote-audit risks and resources should also be planned."}]}],"domains":{"1":"Fundamental principles and concepts of an AI management system","2":"AI management system requirements","3":"Fundamental audit concepts and principles","4":"Preparing an ISO/IEC 42001 audit","5":"Conducting an ISO/IEC 42001 audit","6":"Closing an ISO/IEC 42001 audit","7":"Managing an ISO/IEC 42001 audit programme"}}</script>
+<script>
+"use strict";
+const BANK=JSON.parse(document.getElementById("bankData").textContent);
+const LETTERS=["A","B","C"];
+const STORAGE_HISTORY="iso42001_case_history_v1";
+const STORAGE_ACTIVE="iso42001_case_active_v1";
+const $=id=>document.getElementById(id);
+
+let settings={order:"domain",mode:"study"};
+let state=null;
+let timerId=null;
+let remaining=0;
+let focusedQuestion=0;
+
+function clone(v){return JSON.parse(JSON.stringify(v))}
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+  return a;
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+function paragraphs(text){
+  return text.split(/\n\s*\n/).filter(Boolean).map(p=>`<p>${escapeHtml(p.trim())}</p>`).join("");
+}
+function showScreen(name){
+  ["homeScreen","sessionScreen","resultScreen"].forEach(id=>$(id).classList.toggle("hidden",id!==name));
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function setSegment(id,key){
+  $(id).addEventListener("click",e=>{
+    const b=e.target.closest("button[data-value]"); if(!b)return;
+    [...$(id).querySelectorAll("button")].forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); settings[key]=b.dataset.value;
+    if(key==="order"&&settings.order==="shuffled")$("shuffleOptions").checked=true;
+  });
+}
+function buildScope(){
+  const sel=$("scopeSelect");
+  Object.entries(BANK.domains).forEach(([id,name])=>{
+    const count=BANK.scenarios.filter(s=>String(s.domain)===id).length;
+    const o=document.createElement("option");
+    o.value=id;o.textContent=`Domain ${id}: ${name} (${count} scenario${count===1?"":"s"})`;
+    sel.appendChild(o);
+  });
+  sel.addEventListener("change",()=>{
+    const max=sel.value==="all"?12:BANK.scenarios.filter(s=>String(s.domain)===sel.value).length;
+    const options=[...$("scenarioCount").options];
+    options.forEach(o=>o.disabled=Number(o.value)>max);
+    const allowed=options.filter(o=>!o.disabled);
+    if(Number($("scenarioCount").value)>max)$("scenarioCount").value=String(allowed[allowed.length-1]?.value||max);
+  });
+}
+function prepareScenarios(customIds=null){
+  let pool=clone(BANK.scenarios);
+  const scope=$("scopeSelect").value;
+  if(customIds) pool=pool.filter(s=>customIds.includes(s.id));
+  else if(scope!=="all") pool=pool.filter(s=>String(s.domain)===scope);
+  if(settings.order==="domain") pool.sort((a,b)=>a.domain-b.domain||a.id.localeCompare(b.id));
+  else pool=shuffle(pool);
+  const requested=customIds?pool.length:Math.min(Number($("scenarioCount").value),pool.length);
+  pool=pool.slice(0,requested);
+  const randomise=$("shuffleOptions").checked||settings.order==="shuffled";
+  if(randomise){
+    pool.forEach(sc=>sc.questions.forEach(q=>{
+      const packed=q.options.map((text,index)=>({text,correct:index===q.answer}));
+      const mixed=shuffle(packed);
+      q.options=mixed.map(x=>x.text);q.answer=mixed.findIndex(x=>x.correct);
+    }));
+  }
+  return pool;
+}
+function startSession(customIds=null){
+  const list=prepareScenarios(customIds);
+  if(!list.length){alert("No scenarios match this selection.");return}
+  state={
+    scenarios:list,current:0,mode:settings.mode,order:settings.order,
+    responses:{},flags:{},checked:{},startedAt:Date.now(),
+    duration:customIds?0:Math.max(0,Number($("minutes").value)||0)*60,
+    finished:false
+  };
+  remaining=state.duration;
+  saveActive();
+  showScreen("sessionScreen");
+  startTimer();
+  renderScenario();
+}
+function responseKey(si,qi){return `${si}:${qi}`}
+function renderScenario(){
+  if(!state)return;
+  const si=state.current,sc=state.scenarios[si];
+  $("scenarioNumber").textContent=`Scenario ${si+1} of ${state.scenarios.length}`;
+  $("scenarioDomain").textContent=`Domain ${sc.domain}`;
+  $("scenarioTitle").textContent=sc.title;
+  $("scenarioCopy").innerHTML=paragraphs(sc.text);
+  $("scenarioCopy").classList.remove("hidden");
+  $("collapseScenarioBtn").textContent="Collapse scenario";
+  $("scenarioFlag").classList.toggle("hidden",!state.flags[si]);
+  $("flagBtn").textContent=state.flags[si]?"Unflag scenario":"Flag scenario";
+  $("prevBtn").disabled=si===0;
+  $("nextBtn").disabled=si===state.scenarios.length-1;
+  const checked=!!state.checked[si];
+  $("submitScenarioBtn").classList.toggle("hidden",state.mode==="exam"||checked);
+  $("nextBtn").classList.toggle("hidden",state.mode==="study"&&!checked);
+  $("finishBtn").classList.toggle("hidden",state.mode==="study"&&si<state.scenarios.length-1&&!checked);
+
+  const wrap=$("questions");wrap.innerHTML="";
+  sc.questions.forEach((q,qi)=>{
+    const key=responseKey(si,qi);
+    const selected=state.responses[key];
+    const reveal=state.mode==="study"&&checked;
+    const card=document.createElement("section");
+    card.className="question-card"+(selected!==undefined?" answered":"");
+    if(reveal)card.classList.add(selected===q.answer?"correct":"incorrect");
+    card.innerHTML=`
+      <div class="q-kicker"><span class="q-num">Question ${si*5+qi+1} • Case question ${qi+1} of 5</span>${selected!==undefined?'<span class="pill success">Answered</span>':""}</div>
+      <h3 class="q-text">${escapeHtml(q.q)}</h3>
+      <div class="option-list"></div>
+      <div class="feedback-slot"></div>`;
+    const list=card.querySelector(".option-list");
+    q.options.forEach((opt,oi)=>{
+      const b=document.createElement("button");b.type="button";
+      b.className="option"+(selected===oi?" selected":"");
+      if(reveal&&oi===q.answer)b.classList.add("correct-answer");
+      if(reveal&&selected===oi&&selected!==q.answer)b.classList.add("wrong-answer");
+      b.disabled=reveal;
+      b.innerHTML=`<span class="letter">${LETTERS[oi]}</span><span>${escapeHtml(opt)}</span>`;
+      b.addEventListener("click",()=>selectAnswer(qi,oi));
+      list.appendChild(b);
+    });
+    if(reveal){
+      const good=selected===q.answer;
+      card.querySelector(".feedback-slot").innerHTML=`
+        <div class="feedback ${good?"good":"bad"}">
+          <strong>${good?"Correct":"Incorrect"}. Best answer: ${LETTERS[q.answer]}</strong>
+          <p>${escapeHtml(q.rationale)}</p>
+          <div class="ref"><strong>Principal reference:</strong> ${escapeHtml(q.ref)}</div>
+        </div>`;
+    }
+    wrap.appendChild(card);
+  });
+  focusedQuestion=0;
+  renderSidebar();
+  updateHeader();
+  saveActive();
+}
+function selectAnswer(qi,oi){
+  if(!state||state.finished)return;
+  if(state.mode==="study"&&state.checked[state.current])return;
+  state.responses[responseKey(state.current,qi)]=oi;
+  focusedQuestion=qi;
+  renderScenario();
+}
+function checkScenario(){
+  const si=state.current;
+  const unanswered=state.scenarios[si].questions.filter((_,qi)=>state.responses[responseKey(si,qi)]===undefined).length;
+  if(unanswered&& !confirm(`${unanswered} question${unanswered===1?" is":"s are"} unanswered. Check the scenario anyway?`))return;
+  state.checked[si]=true;renderScenario();
+}
+function go(delta){
+  const next=state.current+delta;
+  if(next<0||next>=state.scenarios.length)return;
+  if(state.mode==="study"&&!state.checked[state.current]){
+    alert("Check this scenario before moving on in Study mode.");return;
+  }
+  state.current=next;renderScenario();
+}
+function renderSidebar(){
+  const total=state.scenarios.length*5;
+  const answered=Object.values(state.responses).filter(v=>v!==undefined).length;
+  const flagged=Object.values(state.flags).filter(Boolean).length;
+  $("answeredCount").textContent=answered;
+  $("flaggedCount").textContent=flagged;
+  $("progressBar").style.width=`${Math.round(answered/total*100)}%`;
+  $("progressText").textContent=`${answered} of ${total} questions answered`;
+  const nav=$("scenarioNav");nav.innerHTML="";
+  state.scenarios.forEach((sc,i)=>{
+    const count=sc.questions.filter((_,qi)=>state.responses[responseKey(i,qi)]!==undefined).length;
+    const b=document.createElement("button");b.type="button";
+    b.className="nav-s"+(i===state.current?" current":"")+(count===5?" complete":"")+(state.flags[i]?" flagged":"");
+    b.textContent=`${i+1} (${count}/5)`;
+    b.title=sc.title;
+    b.addEventListener("click",()=>{
+      if(state.mode==="study"&&!state.checked[state.current]&&i!==state.current){alert("Check this scenario before navigating away in Study mode.");return}
+      state.current=i;renderScenario();
+    });
+    nav.appendChild(b);
+  });
+}
+function toggleFlag(){
+  state.flags[state.current]=!state.flags[state.current];renderScenario();
+}
+function toggleScenario(){
+  const hidden=$("scenarioCopy").classList.toggle("hidden");
+  $("collapseScenarioBtn").textContent=hidden?"Expand scenario":"Collapse scenario";
+}
+function startTimer(){
+  clearInterval(timerId);
+  if(!state.duration){$("timer").textContent="Untimed";return}
+  const elapsed=Math.floor((Date.now()-state.startedAt)/1000);
+  remaining=Math.max(0,state.duration-elapsed);
+  updateTimer();
+  timerId=setInterval(()=>{remaining--;updateTimer();if(remaining<=0){clearInterval(timerId);finishSession(true)}},1000);
+}
+function updateTimer(){
+  const m=Math.floor(remaining/60),s=remaining%60;
+  $("timer").textContent=`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  $("timer").classList.toggle("low",remaining<=300);
+}
+function finishSession(timedOut=false){
+  if(!state||state.finished)return;
+  const total=state.scenarios.length*5;
+  const answered=Object.values(state.responses).filter(v=>v!==undefined).length;
+  if(!timedOut&&answered<total&&!confirm(`${total-answered} questions are unanswered. Finish the session?`))return;
+  clearInterval(timerId);state.finished=true;state.finishedAt=Date.now();saveActive();
+  renderResults(timedOut);
+}
+function scoreState(){
+  let correct=0;const byDomain={};
+  state.scenarios.forEach((sc,si)=>{
+    byDomain[sc.domain]??={correct:0,total:0};
+    sc.questions.forEach((q,qi)=>{
+      byDomain[sc.domain].total++;
+      if(state.responses[responseKey(si,qi)]===q.answer){correct++;byDomain[sc.domain].correct++}
+    });
+  });
+  return {correct,total:state.scenarios.length*5,byDomain};
+}
+function renderResults(timedOut=false){
+  const result=scoreState(),pct=Math.round(result.correct/result.total*100);
+  $("scorePercent").textContent=`${pct}%`;
+  $("scoreFraction").textContent=`${result.correct} of ${result.total}`;
+  $("scoreRing").style.setProperty("--score",`${pct*3.6}deg`);
+  const descriptor=pct>=80?"Strong performance":pct>=70?"Developing readiness":pct>=60?"Targeted revision recommended":"Substantial revision recommended";
+  $("resultSummary").textContent=`${descriptor}. You completed ${state.scenarios.length} scenarios${timedOut?" and the timer expired":""}.`;
+  const rows=$("domainRows");rows.innerHTML="";
+  Object.entries(result.byDomain).sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([d,v])=>{
+    const p=Math.round(v.correct/v.total*100);
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td><strong>Domain ${d}</strong><div style="font-size:12px;color:var(--muted)">${escapeHtml(BANK.domains[d])}</div></td>
+      <td>${v.correct}/${v.total} (${p}%)</td>
+      <td><div class="bar"><span style="width:${p}%"></span></div></td>`;
+    rows.appendChild(tr);
+  });
+  saveHistory(pct,result.correct,result.total);
+  $("reviewSection").classList.add("hidden");
+  showScreen("resultScreen");
+  $("headerStatus").textContent=`Result: ${pct}%`;
+  localStorage.removeItem(STORAGE_ACTIVE);
+}
+function renderReview(missedOnly=true){
+  const list=$("reviewList");list.innerHTML="";
+  state.scenarios.forEach((sc,si)=>{
+    sc.questions.forEach((q,qi)=>{
+      const selected=state.responses[responseKey(si,qi)];
+      const correct=selected===q.answer;
+      if(missedOnly&&correct)return;
+      const card=document.createElement("article");card.className="card review-card";
+      card.innerHTML=`
+        <div class="q-kicker"><span class="pill">Scenario ${si+1}</span><span class="pill domain">Domain ${sc.domain}</span></div>
+        <h4>${escapeHtml(q.q)}</h4>
+        <details><summary style="cursor:pointer;font-weight:750">Show case context</summary><div class="review-scenario">${paragraphs(sc.text)}</div></details>
+        <div class="review-answer ${correct?"":"user-wrong"}"><strong>Your answer:</strong> ${selected===undefined?"Unanswered":`${LETTERS[selected]}. ${escapeHtml(q.options[selected])}`}</div>
+        <div class="review-answer correct-answer"><strong>Best answer:</strong> ${LETTERS[q.answer]}. ${escapeHtml(q.options[q.answer])}</div>
+        <div class="explanation"><p><strong>Why:</strong> ${escapeHtml(q.rationale)}</p><p><strong>Principal reference:</strong> ${escapeHtml(q.ref)}</p></div>`;
+      list.appendChild(card);
+    });
+  });
+  if(!list.children.length)list.innerHTML='<div class="empty">No missed questions. Excellent work.</div>';
+  $("reviewSection").classList.remove("hidden");
+  $("reviewSection").scrollIntoView({behavior:"smooth"});
+}
+function retakeMissed(){
+  const ids=[];
+  state.scenarios.forEach((sc,si)=>{
+    const missed=sc.questions.some((q,qi)=>state.responses[responseKey(si,qi)]!==q.answer);
+    if(missed)ids.push(sc.id);
+  });
+  if(!ids.length){alert("There are no missed scenarios to retake.");return}
+  settings.mode="study";settings.order="shuffled";startSession(ids);
+}
+function saveHistory(pct,correct,total){
+  const h=JSON.parse(localStorage.getItem(STORAGE_HISTORY)||"[]");
+  h.unshift({date:new Date().toISOString(),pct,correct,total,scenarios:state.scenarios.length,mode:state.mode,order:state.order});
+  localStorage.setItem(STORAGE_HISTORY,JSON.stringify(h.slice(0,8)));renderHistory();
+}
+function renderHistory(){
+  const h=JSON.parse(localStorage.getItem(STORAGE_HISTORY)||"[]");
+  const box=$("history");box.innerHTML="";
+  if(!h.length){box.innerHTML='<div class="empty">No completed sessions yet.</div>';return}
+  h.forEach(x=>{
+    const d=document.createElement("div");d.className="history-item";
+    d.innerHTML=`<div class="history-top"><span>${x.scenarios} scenarios • ${x.mode==="study"?"Study":"Exam"}</span><span>${x.pct}%</span></div>
+      <div class="history-meta">${new Date(x.date).toLocaleString("en-AU")} • ${x.correct}/${x.total} correct • ${x.order==="domain"?"By domain":"Shuffled"}</div>`;
+    box.appendChild(d);
+  });
+}
+function saveActive(){if(state&&!state.finished)localStorage.setItem(STORAGE_ACTIVE,JSON.stringify(state))}
+function updateHeader(){$("headerStatus").textContent=state?`Scenario ${state.current+1}/${state.scenarios.length}`:"Set 4 scenario bank"}
+function goHome(){
+  if(state&&!state.finished&& !confirm("Leave this session? Your current progress will remain saved in this browser."))return;
+  clearInterval(timerId);showScreen("homeScreen");renderHistory();$("headerStatus").textContent="Set 4 scenario bank";
+}
+function wire(){
+  setSegment("orderSeg","order");setSegment("modeSeg","mode");buildScope();renderHistory();
+  $("startBtn").addEventListener("click",()=>startSession());
+  $("clearHistoryBtn").addEventListener("click",()=>{if(confirm("Clear saved result history?")){localStorage.removeItem(STORAGE_HISTORY);renderHistory()}});
+  $("homeBtn").addEventListener("click",goHome);
+  $("prevBtn").addEventListener("click",()=>go(-1));$("nextBtn").addEventListener("click",()=>go(1));
+  $("flagBtn").addEventListener("click",toggleFlag);$("collapseScenarioBtn").addEventListener("click",toggleScenario);
+  $("submitScenarioBtn").addEventListener("click",checkScenario);$("finishBtn").addEventListener("click",()=>finishSession(false));
+  $("mobileNavToggle").addEventListener("click",()=>$("sideCard").classList.toggle("collapsed"));
+  $("reviewMissedBtn").addEventListener("click",()=>renderReview(true));$("retakeMissedBtn").addEventListener("click",retakeMissed);
+  $("printBtn").addEventListener("click",()=>window.print());$("newSessionBtn").addEventListener("click",()=>{state=null;showScreen("homeScreen");renderHistory()});
+  document.addEventListener("keydown",e=>{
+    if($("sessionScreen").classList.contains("hidden")||!state)return;
+    if(["1","2","3"].includes(e.key)){selectAnswer(focusedQuestion,Number(e.key)-1)}
+    else if(e.key.toLowerCase()==="f")toggleFlag();
+  });
+  const active=localStorage.getItem(STORAGE_ACTIVE);
+  if(active){
+    try{
+      const saved=JSON.parse(active);
+      if(saved&&!saved.finished&&saved.scenarios?.length&&confirm("Resume your saved case-study session?")){
+        state=saved;remaining=state.duration;showScreen("sessionScreen");startTimer();renderScenario();
+      }
+    }catch(_){}
+  }
+}
+wire();
+if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
+</script>
+</body>
+</html>
