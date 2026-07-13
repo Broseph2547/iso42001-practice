@@ -75,6 +75,12 @@
     .history-item:last-child{border-bottom:0}
     .history-top{display:flex;justify-content:space-between;gap:10px;font-weight:700}
     .history-meta{font-size:12px;color:var(--muted);margin-top:3px}
+    .rotation-box{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:#f8fafc}
+    .rotation-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+    .rotation-title{font-weight:800;color:#344054}
+    .rotation-meta{font-size:12px;color:var(--muted);margin-top:5px}
+    .rotation-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
     .pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;background:#f2f4f7;color:#475467}
     .pill.domain{background:var(--blue-soft);color:#1849a9}
     .pill.flag{background:var(--warn-soft);color:var(--warn)}
@@ -195,10 +201,10 @@
       <div class="mark">AIMS</div>
       <div>
         <div class="brand-title">ISO/IEC 42001 Lead Auditor Practice</div>
-        <div class="brand-sub">Three original question banks • 240 questions • offline-ready</div>
+        <div class="brand-sub">Two original question banks • offline-ready</div>
       </div>
       <div class="topbar-spacer"></div>
-      <div id="headerStatus" class="top-stat">240 questions available</div>
+      <div id="headerStatus" class="top-stat">240 questions available • smart rotation</div>
       <button class="btn btn-ghost no-print" id="homeBtn" title="Return home">Home</button>
     </div>
   </header>
@@ -268,6 +274,20 @@
                 <label class="switch" aria-label="Shuffle answer options"><input id="shuffleOptionsToggle" type="checkbox" checked><span class="slider"></span></label>
               </div>
             </div>
+            <div class="field full" id="rotationField">
+              <div class="toggle-row">
+                <div><strong>Smart no-repeat rotation</strong><small>Prioritises unseen questions, then brings weaker or flagged questions forward in the next rotation.</small></div>
+                <label class="switch" aria-label="Use smart no-repeat rotation"><input id="smartRotationToggle" type="checkbox" checked><span class="slider"></span></label>
+              </div>
+            </div>
+            <div class="field full" id="rotationStatusField">
+              <div class="rotation-box">
+                <div class="rotation-top"><span class="rotation-title">Current rotation</span><span id="rotationCycle" class="pill domain">Cycle 1</span></div>
+                <div class="progress-line"><span id="rotationProgressBar" style="width:0"></span></div>
+                <div id="rotationStatusText" class="rotation-meta">Loading rotation progress…</div>
+                <div class="rotation-actions"><button type="button" class="btn btn-secondary" id="resetRotationBtn">Reset current rotation</button><button type="button" class="btn btn-ghost" id="resetLearningBtn">Reset rotation and adaptive history</button></div>
+              </div>
+            </div>
           </div>
           <div class="actions" style="margin-top:20px">
             <button class="btn btn-primary" id="startBtn">Start practice session</button>
@@ -278,7 +298,7 @@
         <aside class="grid" style="align-content:start">
           <div class="card card-pad">
             <h3 style="margin-bottom:8px">Included</h3>
-            <p style="margin:0;color:var(--muted)">Two 80-question banks, seven competency domains, four written tasks per set, answer rationales, study pointers, exam-writer traps and local progress saving.</p>
+            <p style="margin:0;color:var(--muted)">Three 80-question banks, seven competency domains, written auditor tasks, answer rationales, smart no-repeat rotation, adaptive revision and local progress saving.</p>
           </div>
           <div class="card card-pad">
             <h3 style="margin-bottom:6px">Recent attempts</h3>
@@ -401,76 +421,144 @@ let timerHandle = null;
 let lastResult = null;
 
 function getSet(id){ return APP_DATA.sets.find(s=>s.id===id); }
-function qKey(q){ return `${q.setId||session?.setId}-${q.id}`; }
 function shuffle(a){ const x=[...a]; for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]];} return x; }
-function escapeHtml(s=''){ return s.replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c])); }
+function escapeHtml(s=''){ return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c])); }
 function fmtTime(sec){ sec=Math.max(0,Math.floor(sec)); const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60; return [h,m,s].map(v=>String(v).padStart(2,'0')).join(':'); }
 function showScreen(id){ screens.forEach(x=>$(x).classList.toggle('hidden',x!==id)); window.scrollTo({top:0,behaviour:'smooth'}); $('homeBtn').classList.toggle('hidden',id==='homeScreen'); }
 function saveSession(){ if(session) store.setItem(`${STORAGE_PREFIX}:session`,JSON.stringify(session)); updateResume(); }
 function clearSession(){ store.removeItem(`${STORAGE_PREFIX}:session`); session=null; updateResume(); }
 function getHistory(){ try{return JSON.parse(store.getItem(`${STORAGE_PREFIX}:history`)||'[]')}catch{return[]} }
 function saveHistory(item){ const h=getHistory(); h.unshift(item); store.setItem(`${STORAGE_PREFIX}:history`,JSON.stringify(h.slice(0,12))); renderHistory(); }
+function rotationScope(){ return ui.mode==='domain' ? String($('domainSelect').value||'all') : 'all'; }
+function rotationKey(setId,scope){ return `${STORAGE_PREFIX}:rotation:${setId}:${scope}`; }
+function statsKey(setId){ return `${STORAGE_PREFIX}:stats:${setId}`; }
+function getStats(setId){ try{return JSON.parse(store.getItem(statsKey(setId))||'{}')}catch{return{}} }
+function saveStats(setId,stats){ store.setItem(statsKey(setId),JSON.stringify(stats)); }
+function eligiblePool(){
+  const set=getSet($('setSelect').value); let pool=[...set.questions]; const scope=rotationScope();
+  if(ui.mode==='domain' && scope!=='all') pool=pool.filter(q=>q.domain===Number(scope));
+  return pool;
+}
+function getRotation(setId,scope,eligibleIds){
+  let r; try{r=JSON.parse(store.getItem(rotationKey(setId,scope))||'null')}catch{}
+  if(!r||!Array.isArray(r.seen))r={cycle:1,seen:[],startedAt:Date.now()};
+  const valid=new Set(eligibleIds); r.seen=[...new Set(r.seen.filter(id=>valid.has(id)))];
+  r.cycle=Math.max(1,Number(r.cycle)||1); return r;
+}
+function saveRotation(setId,scope,r){ store.setItem(rotationKey(setId,scope),JSON.stringify(r)); }
+function weaknessScore(q,stats){
+  const s=stats[String(q.id)]||{}; const attempts=Number(s.attempts)||0,incorrect=Number(s.incorrect)||0,flagged=Number(s.flagged)||0;
+  const errorRate=attempts?incorrect/attempts:0; const recency=s.lastSeen?Math.min(2,(Date.now()-s.lastSeen)/(1000*60*60*24*30)):2;
+  return errorRate*7 + Math.min(flagged,4)*1.5 + recency + Math.random()*1.8;
+}
+function adaptiveOrder(pool,setId){ const stats=getStats(setId); return [...pool].sort((a,b)=>weaknessScore(b,stats)-weaknessScore(a,stats)); }
+function balancedTake(pool,n,setId){
+  const groups={}; adaptiveOrder(pool,setId).forEach(q=>(groups[q.domain]??=[]).push(q));
+  const domains=Object.keys(groups).map(Number).sort((a,b)=>a-b); const out=[];
+  while(out.length<n && domains.some(d=>groups[d].length)) for(const d of domains){ if(out.length>=n)break; if(groups[d].length)out.push(groups[d].shift()); }
+  return out;
+}
+function chooseAdaptive(pool,n,setId,scope){
+  if(n>=pool.length)return ui.mode==='domain'?[...pool].sort((a,b)=>a.domain-b.domain||a.id-b.id):shuffle(pool);
+  if(ui.mode==='domain'&&scope==='all')return balancedTake(pool,n,setId);
+  const chosen=adaptiveOrder(pool,setId).slice(0,n);
+  return ui.mode==='domain'?chosen.sort((a,b)=>a.domain-b.domain||a.id-b.id):shuffle(chosen);
+}
+function selectWithRotation(pool,count,setId,scope){
+  const ids=pool.map(q=>q.id),byId=new Map(pool.map(q=>[q.id,q])); let r=getRotation(setId,scope,ids),selected=[];
+  let remaining=pool.filter(q=>!r.seen.includes(q.id));
+  const first=chooseAdaptive(remaining,Math.min(count,remaining.length),setId,scope); selected.push(...first);
+  r.seen.push(...first.map(q=>q.id));
+  if(selected.length<count){
+    r={cycle:r.cycle+1,seen:[],startedAt:Date.now()};
+    const candidates=pool.filter(q=>!selected.some(s=>s.id===q.id));
+    const extra=chooseAdaptive(candidates,Math.min(count-selected.length,candidates.length),setId,scope);
+    selected.push(...extra); r.seen.push(...extra.map(q=>q.id));
+  }
+  r.seen=[...new Set(r.seen.filter(id=>byId.has(id)))]; saveRotation(setId,scope,r);
+  return ui.mode==='domain'?selected.sort((a,b)=>a.domain-b.domain||a.id-b.id):shuffle(selected);
+}
+function updateRotationStatus(){
+  const set=getSet($('setSelect').value),pool=eligiblePool(),scope=rotationScope(),ids=pool.map(q=>q.id),r=getRotation(set.id,scope,ids);
+  const seen=r.seen.length,total=pool.length,remaining=Math.max(0,total-seen),pct=total?Math.round(seen/total*100):0;
+  $('rotationCycle').textContent=`Cycle ${r.cycle}`; $('rotationProgressBar').style.width=`${pct}%`;
+  $('rotationStatusText').textContent=$('smartRotationToggle').checked
+    ? `${remaining} unseen of ${total} eligible questions remain in this rotation. When exhausted, Cycle ${r.cycle+1} starts automatically and weaker or flagged questions are brought forward.`
+    : `Smart rotation is off. Smaller sessions may repeat questions across attempts.`;
+  $('rotationStatusField').classList.toggle('hidden',ui.mode==='written');
+}
+function resetCurrentRotation(){
+  const set=getSet($('setSelect').value),scope=rotationScope();
+  if(!confirm('Reset the current no-repeat rotation for this question bank and domain selection?'))return;
+  store.removeItem(rotationKey(set.id,scope)); updateRotationStatus();
+}
+function resetLearningData(){
+  const set=getSet($('setSelect').value);
+  if(!confirm(`Reset all no-repeat rotations and adaptive performance history for ${set.name}? Completed-attempt history will remain.`))return;
+  const prefixes=[`${STORAGE_PREFIX}:rotation:${set.id}:`];
+  try{for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i);if(prefixes.some(p=>k.startsWith(p)))localStorage.removeItem(k)}}catch{}
+  store.removeItem(statsKey(set.id)); updateRotationStatus();
+}
+function updateLearningStats(details,setId){
+  const stats=getStats(setId),now=Date.now();
+  details.forEach(d=>{const k=String(d.q.id),s=stats[k]||{attempts:0,correct:0,incorrect:0,flagged:0};s.attempts++;if(d.ok)s.correct++;else s.incorrect++;s.flagged=Math.max(0,Math.min(6,(Number(s.flagged)||0)+(d.flagged?1:-0.25)));s.lastSeen=now;stats[k]=s});
+  saveStats(setId,stats);
+}
 
 function init(){
-  populateDomains(); bindEvents(); updateModeFields(); updateResume(); renderHistory();
+  populateDomains(); bindEvents(); updateModeFields(); updateResume(); renderHistory(); updateRotationStatus();
   if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 function populateDomains(){
   const sel=$('domainSelect'); sel.innerHTML='<option value="all">All seven domains</option>';
-  getSet($('setSelect').value).domains.forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent=`Domain ${d.id}: ${d.title}`;sel.appendChild(o)});
+  getSet($('setSelect').value).domains.forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent=`Domain ${d.id}: ${d.title}`;sel.appendChild(o)}); updateRotationStatus();
 }
 function bindEvents(){
-  $('modeButtons').addEventListener('click',e=>{const b=e.target.closest('button[data-mode]');if(!b)return;ui.mode=b.dataset.mode;[...$('modeButtons').children].forEach(x=>x.classList.toggle('active',x===b));updateModeFields()});
+  $('modeButtons').addEventListener('click',e=>{const b=e.target.closest('button[data-mode]');if(!b)return;ui.mode=b.dataset.mode;[...$('modeButtons').children].forEach(x=>x.classList.toggle('active',x===b));updateModeFields();updateRotationStatus()});
   $('feedbackButtons').addEventListener('click',e=>{const b=e.target.closest('button[data-feedback]');if(!b)return;ui.feedback=b.dataset.feedback;[...$('feedbackButtons').children].forEach(x=>x.classList.toggle('active',x===b));});
-  $('setSelect').addEventListener('change',populateDomains);
+  $('setSelect').addEventListener('change',()=>{populateDomains();updateRotationStatus()}); $('domainSelect').addEventListener('change',updateRotationStatus);
+  $('smartRotationToggle').addEventListener('change',updateRotationStatus); $('resetRotationBtn').addEventListener('click',resetCurrentRotation); $('resetLearningBtn').addEventListener('click',resetLearningData);
   $('timerToggle').addEventListener('change',()=> $('minutesField').classList.toggle('hidden',!$('timerToggle').checked));
   $('startBtn').addEventListener('click',startFromForm); $('resumeBtn').addEventListener('click',resumeSaved);
   $('homeBtn').addEventListener('click',goHome); $('prevBtn').addEventListener('click',()=>moveQuestion(-1)); $('nextBtn').addEventListener('click',()=>moveQuestion(1));
-  $('flagBtn').addEventListener('click',toggleFlag); $('saveExitBtn').addEventListener('click',()=>{saveSession();stopTimer();showScreen('homeScreen')});
+  $('flagBtn').addEventListener('click',toggleFlag); $('saveExitBtn').addEventListener('click',()=>{saveSession();stopTimer();showScreen('homeScreen');updateRotationStatus()});
   $('submitBtn').addEventListener('click',()=>submitSession(false)); $('navToggle').addEventListener('click',()=> $('sideCard').classList.toggle('collapsed'));
   $('reviewIncorrectBtn').addEventListener('click',()=>renderReview('incorrect')); $('reviewAllBtn').addEventListener('click',()=>renderReview('all'));
   $('hideReviewBtn').addEventListener('click',()=> $('reviewSection').classList.add('hidden')); $('retakeMissedBtn').addEventListener('click',retakeMissed);
-  $('clearWrittenBtn').addEventListener('click',clearWritten);
-  document.addEventListener('keydown',handleKeys);
+  $('clearWrittenBtn').addEventListener('click',clearWritten); document.addEventListener('keydown',handleKeys);
 }
 function updateModeFields(){
   const written=ui.mode==='written';
-  ['domainField','countField','feedbackField','timerField','minutesField','shuffleOptionsField'].forEach(id=>$(id).classList.toggle('hidden',written));
-  $('domainField').classList.toggle('hidden',written || ui.mode!=='domain');
-  if(!written) $('minutesField').classList.toggle('hidden',!$('timerToggle').checked);
-  $('startBtn').textContent=written?'Open written tasks':'Start practice session';
-  if(ui.mode==='shuffled') $('shuffleOptionsToggle').checked=true;
+  ['domainField','countField','feedbackField','timerField','minutesField','shuffleOptionsField','rotationField','rotationStatusField'].forEach(id=>$(id).classList.toggle('hidden',written));
+  $('domainField').classList.toggle('hidden',written || ui.mode!=='domain'); if(!written)$('minutesField').classList.toggle('hidden',!$('timerToggle').checked);
+  $('startBtn').textContent=written?'Open written tasks':'Start practice session'; if(ui.mode==='shuffled')$('shuffleOptionsToggle').checked=true;
 }
 function updateResume(){
   let saved=null;try{saved=JSON.parse(store.getItem(`${STORAGE_PREFIX}:session`)||'null')}catch{}
-  $('resumeBtn').classList.toggle('hidden',!saved || saved.completed);
-  if(saved && !saved.completed) $('resumeBtn').textContent=`Resume ${getSet(saved.setId)?.name||'saved session'} (${Object.keys(saved.answers||{}).length}/${saved.items.length})`;
+  $('resumeBtn').classList.toggle('hidden',!saved || saved.completed); if(saved&&!saved.completed)$('resumeBtn').textContent=`Resume ${getSet(saved.setId)?.name||'saved session'} (${Object.keys(saved.answers||{}).length}/${saved.items.length})`;
 }
 function renderHistory(){
-  const h=getHistory(), box=$('historyList');
-  if(!h.length){box.className='empty';box.textContent='No completed attempts yet.';return}
+  const h=getHistory(),box=$('historyList'); if(!h.length){box.className='empty';box.textContent='No completed attempts yet.';return}
   box.className='';box.innerHTML=h.slice(0,5).map(x=>`<div class="history-item"><div class="history-top"><span>${escapeHtml(x.setName)}</span><span class="pill ${x.percent>=70?'success':'danger'}">${x.percent}%</span></div><div class="history-meta">${escapeHtml(x.modeLabel)} • ${x.correct}/${x.total} • ${new Date(x.date).toLocaleDateString('en-AU')}</div></div>`).join('');
 }
 function startFromForm(){
   if(ui.mode==='written'){openWritten();return}
-  const set=getSet($('setSelect').value); let pool=[...set.questions];
-  const domain=$('domainSelect').value;
-  if(ui.mode==='domain' && domain!=='all') pool=pool.filter(q=>q.domain===Number(domain));
-  let count=$('countSelect').value==='all'?pool.length:Math.min(Number($('countSelect').value),pool.length);
-  if(count<pool.length){
-    if(ui.mode==='shuffled') pool=shuffle(pool).slice(0,count);
-    else if(domain==='all'){
-      const byDom={};pool.forEach(q=>(byDom[q.domain]??=[]).push(q));let selected=[];let d=1;while(selected.length<count){if(byDom[d]?.length)selected.push(byDom[d].shift());d=d===7?1:d+1}pool=selected.sort((a,b)=>a.id-b.id);
-    } else pool=pool.slice(0,count);
+  const set=getSet($('setSelect').value); let pool=eligiblePool(); const domain=rotationScope();
+  const count=$('countSelect').value==='all'?pool.length:Math.min(Number($('countSelect').value),pool.length);
+  if($('smartRotationToggle').checked)pool=selectWithRotation(pool,count,set.id,domain);
+  else{
+    if(count<pool.length){
+      if(ui.mode==='shuffled')pool=shuffle(pool).slice(0,count);
+      else if(domain==='all'){const byDom={};pool.forEach(q=>(byDom[q.domain]??=[]).push(q));let selected=[],d=1;while(selected.length<count){if(byDom[d]?.length)selected.push(byDom[d].shift());d=d===7?1:d+1}pool=selected.sort((a,b)=>a.id-b.id)}
+      else pool=pool.slice(0,count);
+    }
+    if(ui.mode==='shuffled')pool=shuffle(pool);
   }
-  if(ui.mode==='shuffled') pool=shuffle(pool);
   const shuffleOptions=$('shuffleOptionsToggle').checked;
-  session={
-    id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),setId:set.id,setName:set.name,mode:ui.mode,feedback:ui.feedback,
-    domain,items:pool.map(q=>({id:q.id,optionOrder:shuffleOptions?shuffle(['A','B','C','D']):['A','B','C','D']})),
-    answers:{},firstAnswers:{},flagged:[],currentIndex:0,startedAt:Date.now(),timerEnabled:$('timerToggle').checked,durationSec:Number($('minutesInput').value||180)*60,completed:false
-  };
-  saveSession();startQuizUI();
+  session={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),setId:set.id,setName:set.name,mode:ui.mode,feedback:ui.feedback,domain,
+    rotationEnabled:$('smartRotationToggle').checked,items:pool.map(q=>({id:q.id,optionOrder:shuffleOptions?shuffle(['A','B','C','D']):['A','B','C','D']})),
+    answers:{},firstAnswers:{},flagged:[],currentIndex:0,startedAt:Date.now(),timerEnabled:$('timerToggle').checked,durationSec:Number($('minutesInput').value||180)*60,completed:false};
+  saveSession();updateRotationStatus();startQuizUI();
 }
 function resumeSaved(){try{session=JSON.parse(store.getItem(`${STORAGE_PREFIX}:session`));if(session&&!session.completed)startQuizUI()}catch{}}
 function startQuizUI(){showScreen('quizScreen');buildNav();renderQuestion();startTimer();}
@@ -478,81 +566,32 @@ function currentItem(){return session.items[session.currentIndex]}
 function currentQuestion(){const item=currentItem();return getSet(session.setId).questions.find(q=>q.id===item.id)}
 function buildNav(){ $('navGrid').innerHTML=session.items.map((it,i)=>`<button class="nav-q" data-index="${i}" title="Question ${i+1}">${i+1}</button>`).join(''); $('navGrid').onclick=e=>{const b=e.target.closest('[data-index]');if(b){session.currentIndex=Number(b.dataset.index);saveSession();renderQuestion()}}; }
 function renderQuestion(){
-  const q=currentQuestion(), item=currentItem(), key=String(q.id), selected=session.answers[key], locked=session.feedback==='study'&&selected;
-  $('qNumber').textContent=`Question ${session.currentIndex+1} of ${session.items.length} • Source Q${q.id}`;
-  $('qDomain').textContent=`Domain ${q.domain}`; $('qDomain').title=q.domain_title;
-  $('qFlag').classList.toggle('hidden',!session.flagged.includes(q.id)); $('flagBtn').textContent=session.flagged.includes(q.id)?'Unflag':'Flag';
-  $('questionText').textContent=q.prompt;
-  $('optionList').innerHTML=item.optionOrder.map((orig,i)=>{
-    const display=String.fromCharCode(65+i), isSel=selected===orig, isCorrect=q.correct===orig;
-    let cls='option'+(isSel?' selected':''); if(locked){if(isCorrect)cls+=' correct';else if(isSel)cls+=' incorrect'}
-    return `<button class="${cls}" data-original="${orig}" ${locked?'disabled':''}><span class="letter">${display}</span><span>${escapeHtml(q.options[orig])}</span></button>`;
-  }).join('');
-  $('optionList').onclick=e=>{const b=e.target.closest('.option');if(!b||b.disabled)return;selectAnswer(b.dataset.original)};
-  if(locked)renderFeedback(q,selected);else $('feedbackPanel').classList.add('hidden');
-  $('prevBtn').disabled=session.currentIndex===0; $('nextBtn').disabled=session.currentIndex===session.items.length-1;
-  updateSidebar(); saveSession();
+  const q=currentQuestion(),item=currentItem(),key=String(q.id),selected=session.answers[key],locked=session.feedback==='study'&&selected;
+  $('qNumber').textContent=`Question ${session.currentIndex+1} of ${session.items.length} • Source Q${q.id}`; $('qDomain').textContent=`Domain ${q.domain}`;$('qDomain').title=q.domain_title;
+  $('qFlag').classList.toggle('hidden',!session.flagged.includes(q.id));$('flagBtn').textContent=session.flagged.includes(q.id)?'Unflag':'Flag';$('questionText').textContent=q.prompt;
+  $('optionList').innerHTML=item.optionOrder.map((orig,i)=>{const display=String.fromCharCode(65+i),isSel=selected===orig,isCorrect=q.correct===orig;let cls='option'+(isSel?' selected':'');if(locked){if(isCorrect)cls+=' correct';else if(isSel)cls+=' incorrect'}return `<button class="${cls}" data-original="${orig}" ${locked?'disabled':''}><span class="letter">${display}</span><span>${escapeHtml(q.options[orig])}</span></button>`}).join('');
+  $('optionList').onclick=e=>{const b=e.target.closest('.option');if(!b||b.disabled)return;selectAnswer(b.dataset.original)}; if(locked)renderFeedback(q,selected);else $('feedbackPanel').classList.add('hidden');
+  $('prevBtn').disabled=session.currentIndex===0;$('nextBtn').disabled=session.currentIndex===session.items.length-1;updateSidebar();saveSession();
 }
-function selectAnswer(original){
-  const q=currentQuestion(),k=String(q.id); if(!(k in session.firstAnswers))session.firstAnswers[k]=original; session.answers[k]=original; saveSession();renderQuestion();
-  if(session.feedback!=='study' && session.currentIndex<session.items.length-1){/* deliberate no auto-advance */}
-}
-function renderFeedback(q,selected){
-  const ok=selected===q.correct,p=$('feedbackPanel'); p.className=`feedback ${ok?'good':'bad'}`;p.innerHTML=`<h4>${ok?'Correct':'Not quite'}</h4><p><strong>Correct answer:</strong> ${escapeHtml(q.options[q.correct])}</p><p>${escapeHtml(q.rationale)}</p><div class="meta"><strong>Study pointer:</strong> ${escapeHtml(q.study_pointer||'Review the governing requirement and audit principle.')}<br><strong>Common trap:</strong> ${escapeHtml(q.trap)}</div>`;
-}
+function selectAnswer(original){const q=currentQuestion(),k=String(q.id);if(!(k in session.firstAnswers))session.firstAnswers[k]=original;session.answers[k]=original;saveSession();renderQuestion();}
+function renderFeedback(q,selected){const ok=selected===q.correct,p=$('feedbackPanel');p.className=`feedback ${ok?'good':'bad'}`;p.innerHTML=`<h4>${ok?'Correct':'Not quite'}</h4><p><strong>Correct answer:</strong> ${escapeHtml(q.options[q.correct])}</p><p>${escapeHtml(q.rationale)}</p><div class="meta"><strong>Study pointer:</strong> ${escapeHtml(q.study_pointer||'Review the governing requirement and audit principle.')}<br><strong>Common trap:</strong> ${escapeHtml(q.trap)}</div>`;}
 function moveQuestion(delta){const n=session.currentIndex+delta;if(n>=0&&n<session.items.length){session.currentIndex=n;renderQuestion()}}
 function toggleFlag(){const id=currentQuestion().id,i=session.flagged.indexOf(id);if(i>=0)session.flagged.splice(i,1);else session.flagged.push(id);renderQuestion()}
-function updateSidebar(){
-  const answered=Object.keys(session.answers).length,flagged=session.flagged.length,progress=(answered/session.items.length)*100;
-  $('answeredCount').textContent=answered;$('flaggedCount').textContent=flagged;$('progressBar').style.width=`${progress}%`;$('progressText').textContent=`${answered} of ${session.items.length} answered`;$('setLabel').textContent=session.setName;
-  [...$('navGrid').children].forEach((b,i)=>{const qid=session.items[i].id;b.classList.toggle('answered',String(qid) in session.answers);b.classList.toggle('flagged',session.flagged.includes(qid));b.classList.toggle('current',i===session.currentIndex)});
-  $('headerStatus').textContent=`${answered}/${session.items.length} answered`;
-}
-function startTimer(){stopTimer();updateTimer();timerHandle=setInterval(updateTimer,1000)}
-function stopTimer(){if(timerHandle){clearInterval(timerHandle);timerHandle=null}}
-function updateTimer(){
-  if(!session||!session.timerEnabled){$('timerDisplay').textContent='Untimed';$('timerDisplay').classList.remove('low');return}
-  const elapsed=(Date.now()-session.startedAt)/1000,remaining=session.durationSec-elapsed;$('timerDisplay').textContent=fmtTime(remaining);$('timerDisplay').classList.toggle('low',remaining<600);
-  if(remaining<=0){stopTimer();submitSession(true)}
-}
-function submitSession(forced){
-  const unanswered=session.items.length-Object.keys(session.answers).length;
-  if(!forced && unanswered>0 && !confirm(`${unanswered} question${unanswered===1?' is':'s are'} unanswered. Submit anyway?`))return;
-  if(!forced && !confirm('Submit this attempt and reveal the answers?'))return;
-  stopTimer();session.completed=true;session.completedAt=Date.now();saveSession();calculateResults();clearSession();showScreen('resultsScreen');renderResults();
-}
+function updateSidebar(){const answered=Object.keys(session.answers).length,flagged=session.flagged.length,progress=(answered/session.items.length)*100;$('answeredCount').textContent=answered;$('flaggedCount').textContent=flagged;$('progressBar').style.width=`${progress}%`;$('progressText').textContent=`${answered} of ${session.items.length} answered`;$('setLabel').textContent=session.setName;[...$('navGrid').children].forEach((b,i)=>{const qid=session.items[i].id;b.classList.toggle('answered',String(qid) in session.answers);b.classList.toggle('flagged',session.flagged.includes(qid));b.classList.toggle('current',i===session.currentIndex)});$('headerStatus').textContent=`${answered}/${session.items.length} answered`;}
+function startTimer(){stopTimer();updateTimer();timerHandle=setInterval(updateTimer,1000)} function stopTimer(){if(timerHandle){clearInterval(timerHandle);timerHandle=null}}
+function updateTimer(){if(!session||!session.timerEnabled){$('timerDisplay').textContent='Untimed';$('timerDisplay').classList.remove('low');return}const elapsed=(Date.now()-session.startedAt)/1000,remaining=session.durationSec-elapsed;$('timerDisplay').textContent=fmtTime(remaining);$('timerDisplay').classList.toggle('low',remaining<600);if(remaining<=0){stopTimer();submitSession(true)}}
+function submitSession(forced){const unanswered=session.items.length-Object.keys(session.answers).length;if(!forced&&unanswered>0&&!confirm(`${unanswered} question${unanswered===1?' is':'s are'} unanswered. Submit anyway?`))return;if(!forced&&!confirm('Submit this attempt and reveal the answers?'))return;stopTimer();session.completed=true;session.completedAt=Date.now();saveSession();calculateResults();clearSession();showScreen('resultsScreen');renderResults();}
 function calculateResults(){
   const set=getSet(session.setId);let correct=0;const details=session.items.map(it=>{const q=set.questions.find(x=>x.id===it.id),answer=session.answers[String(q.id)]||null,ok=answer===q.correct;if(ok)correct++;return{q,answer,ok,optionOrder:it.optionOrder,flagged:session.flagged.includes(q.id)}});
-  const percent=Math.round(correct/session.items.length*100);lastResult={session:{...session},details,correct,total:session.items.length,percent,timeSec:Math.max(0,(session.completedAt-session.startedAt)/1000)};
-  saveHistory({date:new Date().toISOString(),setName:session.setName,modeLabel:session.mode==='shuffled'?'Shuffled mock':'Domain-organised',correct,total:session.items.length,percent});
+  updateLearningStats(details,session.setId);const percent=Math.round(correct/session.items.length*100);lastResult={session:{...session},details,correct,total:session.items.length,percent,timeSec:Math.max(0,(session.completedAt-session.startedAt)/1000)};
+  saveHistory({date:new Date().toISOString(),setName:session.setName,modeLabel:session.mode==='shuffled'?'Shuffled mock':session.mode==='missed'?'Missed-question revision':'Domain-organised',correct,total:session.items.length,percent});
 }
-function renderResults(){
-  const r=lastResult,pass=r.percent>=70;$('scorePercent').textContent=`${r.percent}%`;$('scoreFraction').textContent=`${r.correct} / ${r.total}`;$('scoreRing').style.setProperty('--score',`${r.percent*3.6}deg`);
-  $('resultHeading').textContent=pass?'Target achieved':'Review recommended';
-  const unanswered=r.details.filter(d=>!d.answer).length;$('resultSummary').textContent=`${r.session.setName}, ${r.session.mode==='shuffled'?'shuffled mock':'domain-organised'} mode. ${r.correct} correct, ${r.total-r.correct-unanswered} incorrect, ${unanswered} unanswered. Time used: ${fmtTime(r.timeSec)}.`;
-  const domains=[...new Set(r.details.map(d=>d.q.domain))];$('domainResults').innerHTML=domains.map(id=>{const ds=r.details.filter(d=>d.q.domain===id),c=ds.filter(d=>d.ok).length,p=Math.round(c/ds.length*100),title=ds[0].q.domain_title;return `<tr><td><strong>Domain ${id}</strong><br><small>${escapeHtml(title)}</small></td><td>${ds.length} question${ds.length===1?'':'s'}</td><td><strong>${c}/${ds.length}</strong> (${p}%)</td><td><div class="bar"><span style="width:${p}%"></span></div></td></tr>`}).join('');
-  $('reviewSection').classList.add('hidden');$('headerStatus').textContent=`Result: ${r.percent}%`;
-}
-function renderReview(type){
-  if(!lastResult)return;let list=type==='incorrect'?lastResult.details.filter(d=>!d.ok):lastResult.details;$('reviewTitle').textContent=type==='incorrect'?'Incorrect and unanswered questions':'Full question review';
-  $('reviewList').innerHTML=list.length?list.map(d=>{const q=d.q,answerText=d.answer?q.options[d.answer]:'No answer selected';return `<article class="card review-card"><div class="question-kicker"><span class="pill domain">Domain ${q.domain}</span><span class="pill ${d.ok?'success':'danger'}">${d.ok?'Correct':'Review'}</span>${d.flagged?'<span class="pill flag">Flagged</span>':''}</div><h4>Source Question ${q.id}: ${escapeHtml(q.prompt)}</h4><div class="review-answer ${d.ok?'':'user-wrong'}"><strong>Your answer:</strong> ${escapeHtml(answerText)}</div><div class="review-answer correct-answer"><strong>Correct answer:</strong> ${escapeHtml(q.options[q.correct])}</div><div class="explanation"><p><strong>Rationale:</strong> ${escapeHtml(q.rationale)}</p><p><strong>Study pointer:</strong> ${escapeHtml(q.study_pointer)}</p><p><strong>Exam-writer trap:</strong> ${escapeHtml(q.trap)}</p></div></article>`}).join(''):'<div class="card empty">No incorrect answers. Excellent work.</div>';
-  $('reviewSection').classList.remove('hidden');$('reviewSection').scrollIntoView({behaviour:'smooth'});
-}
-function retakeMissed(){
-  if(!lastResult)return;const missed=lastResult.details.filter(d=>!d.ok);if(!missed.length){alert('There are no missed questions to retake.');return}
-  const s=lastResult.session;session={id:String(Date.now()),setId:s.setId,setName:s.setName,mode:'missed',feedback:'study',domain:'missed',items:missed.map(d=>({id:d.q.id,optionOrder:shuffle(['A','B','C','D'])})),answers:{},firstAnswers:{},flagged:[],currentIndex:0,startedAt:Date.now(),timerEnabled:false,durationSec:0,completed:false};saveSession();startQuizUI();
-}
-function goHome(){if(session&&!session.completed&&$('quizScreen').classList.contains('hidden')===false){if(!confirm('Save this attempt and return home?'))return;saveSession()}stopTimer();showScreen('homeScreen');$('headerStatus').textContent='240 questions available';updateResume()}
-function handleKeys(e){
-  if($('quizScreen').classList.contains('hidden')||e.target.matches('input,textarea,select'))return;
-  const k=e.key.toUpperCase();if(['A','B','C','D'].includes(k)){const item=currentItem(),orig=item.optionOrder[k.charCodeAt(0)-65];selectAnswer(orig)}else if(e.key==='ArrowRight')moveQuestion(1);else if(e.key==='ArrowLeft')moveQuestion(-1);else if(k==='F')toggleFlag();
-}
-function openWritten(){
-  const set=getSet($('setSelect').value);showScreen('writtenScreen');$('writtenHeading').textContent=`${set.name}: optional written auditor tasks`;$('headerStatus').textContent='Written practice';
-  $('writtenList').innerHTML=set.written_tasks.map(w=>{const storageKey=`${STORAGE_PREFIX}:written:${set.id}:${w.id}`,saved=store.getItem(storageKey)||'';return `<article class="card written-card"><div class="question-kicker"><span class="pill domain">WT${w.id}</span></div><h3>${escapeHtml(w.title)}</h3><p>${escapeHtml(w.task)}</p><label for="wt-${w.id}">Your response</label><textarea id="wt-${w.id}" data-key="${storageKey}" placeholder="Draft your auditor response here...">${escapeHtml(saved)}</textarea><div class="actions no-print" style="margin-top:10px"><button class="btn btn-secondary reveal-model" data-id="${w.id}">Reveal model answer</button></div><div id="model-${w.id}" class="model-answer hidden"><strong>Model answer</strong><p>${escapeHtml(w.model_answer)}</p></div></article>`}).join('');
-  $('writtenList').oninput=e=>{if(e.target.matches('textarea[data-key]'))store.setItem(e.target.dataset.key,e.target.value)};
-  $('writtenList').onclick=e=>{const b=e.target.closest('.reveal-model');if(b){const p=$(`model-${b.dataset.id}`);p.classList.toggle('hidden');b.textContent=p.classList.contains('hidden')?'Reveal model answer':'Hide model answer'}};
-}
+function renderResults(){const r=lastResult,pass=r.percent>=70;$('scorePercent').textContent=`${r.percent}%`;$('scoreFraction').textContent=`${r.correct} / ${r.total}`;$('scoreRing').style.setProperty('--score',`${r.percent*3.6}deg`);$('resultHeading').textContent=pass?'Target achieved':'Review recommended';const unanswered=r.details.filter(d=>!d.answer).length;$('resultSummary').textContent=`${r.session.setName}, ${r.session.mode==='shuffled'?'shuffled mock':r.session.mode==='missed'?'missed-question revision':'domain-organised'} mode. ${r.correct} correct, ${r.total-r.correct-unanswered} incorrect, ${unanswered} unanswered. Time used: ${fmtTime(r.timeSec)}.`;const domains=[...new Set(r.details.map(d=>d.q.domain))];$('domainResults').innerHTML=domains.map(id=>{const ds=r.details.filter(d=>d.q.domain===id),c=ds.filter(d=>d.ok).length,p=Math.round(c/ds.length*100),title=ds[0].q.domain_title;return `<tr><td><strong>Domain ${id}</strong><br><small>${escapeHtml(title)}</small></td><td>${ds.length} question${ds.length===1?'':'s'}</td><td><strong>${c}/${ds.length}</strong> (${p}%)</td><td><div class="bar"><span style="width:${p}%"></span></div></td></tr>`}).join('');$('reviewSection').classList.add('hidden');$('headerStatus').textContent=`Result: ${r.percent}%`;updateRotationStatus();}
+function renderReview(type){if(!lastResult)return;let list=type==='incorrect'?lastResult.details.filter(d=>!d.ok):lastResult.details;$('reviewTitle').textContent=type==='incorrect'?'Incorrect and unanswered questions':'Full question review';$('reviewList').innerHTML=list.length?list.map(d=>{const q=d.q,answerText=d.answer?q.options[d.answer]:'No answer selected';return `<article class="card review-card"><div class="question-kicker"><span class="pill domain">Domain ${q.domain}</span><span class="pill ${d.ok?'success':'danger'}">${d.ok?'Correct':'Review'}</span>${d.flagged?'<span class="pill flag">Flagged</span>':''}</div><h4>Source Question ${q.id}: ${escapeHtml(q.prompt)}</h4><div class="review-answer ${d.ok?'':'user-wrong'}"><strong>Your answer:</strong> ${escapeHtml(answerText)}</div><div class="review-answer correct-answer"><strong>Correct answer:</strong> ${escapeHtml(q.options[q.correct])}</div><div class="explanation"><p><strong>Rationale:</strong> ${escapeHtml(q.rationale)}</p><p><strong>Study pointer:</strong> ${escapeHtml(q.study_pointer)}</p><p><strong>Exam-writer trap:</strong> ${escapeHtml(q.trap)}</p></div></article>`}).join(''):'<div class="card empty">No incorrect answers. Excellent work.</div>';$('reviewSection').classList.remove('hidden');$('reviewSection').scrollIntoView({behaviour:'smooth'});}
+function retakeMissed(){if(!lastResult)return;const missed=lastResult.details.filter(d=>!d.ok);if(!missed.length){alert('There are no missed questions to retake.');return}const s=lastResult.session;session={id:String(Date.now()),setId:s.setId,setName:s.setName,mode:'missed',feedback:'study',domain:'missed',rotationEnabled:false,items:missed.map(d=>({id:d.q.id,optionOrder:shuffle(['A','B','C','D'])})),answers:{},firstAnswers:{},flagged:[],currentIndex:0,startedAt:Date.now(),timerEnabled:false,durationSec:0,completed:false};saveSession();startQuizUI();}
+function goHome(){if(session&&!session.completed&&!$('quizScreen').classList.contains('hidden')){if(!confirm('Save this attempt and return home?'))return;saveSession()}stopTimer();showScreen('homeScreen');$('headerStatus').textContent='240 questions available • smart rotation';updateResume();updateRotationStatus();}
+function handleKeys(e){if($('quizScreen').classList.contains('hidden')||e.target.matches('input,textarea,select'))return;const k=e.key.toUpperCase();if(['A','B','C','D'].includes(k)){const item=currentItem(),orig=item.optionOrder[k.charCodeAt(0)-65];selectAnswer(orig)}else if(e.key==='ArrowRight')moveQuestion(1);else if(e.key==='ArrowLeft')moveQuestion(-1);else if(k==='F')toggleFlag();}
+function openWritten(){const set=getSet($('setSelect').value);showScreen('writtenScreen');$('writtenHeading').textContent=`${set.name}: optional written auditor tasks`;$('headerStatus').textContent='Written practice';$('writtenList').innerHTML=set.written_tasks.map(w=>{const storageKey=`${STORAGE_PREFIX}:written:${set.id}:${w.id}`,saved=store.getItem(storageKey)||'';return `<article class="card written-card"><div class="question-kicker"><span class="pill domain">WT${w.id}</span></div><h3>${escapeHtml(w.title)}</h3><p>${escapeHtml(w.task)}</p><label for="wt-${w.id}">Your response</label><textarea id="wt-${w.id}" data-key="${storageKey}" placeholder="Draft your auditor response here...">${escapeHtml(saved)}</textarea><div class="actions no-print" style="margin-top:10px"><button class="btn btn-secondary reveal-model" data-id="${w.id}">Reveal model answer</button></div><div id="model-${w.id}" class="model-answer hidden"><strong>Model answer</strong><p>${escapeHtml(w.model_answer)}</p></div></article>`}).join('');$('writtenList').oninput=e=>{if(e.target.matches('textarea[data-key]'))store.setItem(e.target.dataset.key,e.target.value)};$('writtenList').onclick=e=>{const b=e.target.closest('.reveal-model');if(b){const p=$(`model-${b.dataset.id}`);p.classList.toggle('hidden');b.textContent=p.classList.contains('hidden')?'Reveal model answer':'Hide model answer'}};}
 function clearWritten(){if(!confirm('Clear all written responses for this question bank?'))return;document.querySelectorAll('#writtenList textarea[data-key]').forEach(t=>{store.removeItem(t.dataset.key);t.value=''})}
 init();
 </script>

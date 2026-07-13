@@ -1,7 +1,7 @@
 {
-  "name": "ISO/IEC 42001 Lead Auditor Practice Suite",
+  "name": "ISO/IEC 42001 Lead Auditor Smart Practice Suite",
   "short_name": "42001 Practice",
-  "description": "A complete 300-question ISO/IEC 42001 Lead Auditor practice suite.",
+  "description": "300-question practice suite with smart no-repeat rotation and adaptive revision.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -77,6 +77,11 @@
     .history-item:last-child{border-bottom:0}
     .history-top{display:flex;justify-content:space-between;gap:10px;font-weight:750}
     .history-meta{font-size:12px;color:var(--muted);margin-top:3px}
+    .rotation-box{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:#f8fafc}
+    .rotation-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+    .rotation-meta{font-size:12px;color:var(--muted);margin-top:5px}
+    .rotation-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
     .empty{color:var(--muted);text-align:center;padding:22px}
 
     .session-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
@@ -192,7 +197,7 @@
     <div class="mark">AIMS</div>
     <div>
       <div class="brand-title">ISO/IEC 42001 Case-Study Practice</div>
-      <div class="brand-sub">12 scenarios • 60 linked questions • offline-ready</div>
+      <div class="brand-sub">12 scenarios • 60 linked questions • smart rotation</div>
     </div>
     <div class="spacer"></div>
     <div id="headerStatus" class="header-stat">Set 4 scenario bank</div>
@@ -250,6 +255,20 @@
           <div class="toggle-row">
             <div><strong>Randomise answer options</strong><small>Enabled automatically for shuffled mode</small></div>
             <label class="switch"><input id="shuffleOptions" type="checkbox"><span class="slider"></span></label>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="toggle-row">
+            <div><strong>Smart no-repeat scenario rotation</strong><small>Prioritises unseen cases and brings weaker or flagged scenarios forward after the bank is exhausted.</small></div>
+            <label class="switch"><input id="smartRotation" type="checkbox" checked><span class="slider"></span></label>
+          </div>
+        </div>
+        <div class="field full">
+          <div class="rotation-box">
+            <div class="rotation-top"><strong>Current scenario rotation</strong><span id="caseRotationCycle" class="pill domain">Cycle 1</span></div>
+            <div class="progress-line"><span id="caseRotationBar" style="width:0"></span></div>
+            <div id="caseRotationText" class="rotation-meta"></div>
+            <div class="rotation-actions"><button type="button" id="resetCaseRotation" class="btn btn-secondary">Reset current rotation</button><button type="button" id="resetCaseLearning" class="btn btn-ghost">Reset rotation and adaptive history</button></div>
           </div>
         </div>
         <div class="field full">
@@ -356,330 +375,56 @@ const BANK=JSON.parse(document.getElementById("bankData").textContent);
 const LETTERS=["A","B","C"];
 const STORAGE_HISTORY="iso42001_case_history_v1";
 const STORAGE_ACTIVE="iso42001_case_active_v1";
+const STORAGE_ROTATION="iso42001_case_rotation_v2";
+const STORAGE_STATS="iso42001_case_stats_v2";
 const $=id=>document.getElementById(id);
-
 let settings={order:"domain",mode:"study"};
-let state=null;
-let timerId=null;
-let remaining=0;
-let focusedQuestion=0;
-
+let state=null;let timerId=null;let remaining=0;let focusedQuestion=0;
 function clone(v){return JSON.parse(JSON.stringify(v))}
-function shuffle(arr){
-  const a=[...arr];
-  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
-  return a;
-}
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
-}
-function paragraphs(text){
-  return text.split(/\n\s*\n/).filter(Boolean).map(p=>`<p>${escapeHtml(p.trim())}</p>`).join("");
-}
-function showScreen(name){
-  ["homeScreen","sessionScreen","resultScreen"].forEach(id=>$(id).classList.toggle("hidden",id!==name));
-  window.scrollTo({top:0,behavior:"smooth"});
-}
-function setSegment(id,key){
-  $(id).addEventListener("click",e=>{
-    const b=e.target.closest("button[data-value]"); if(!b)return;
-    [...$(id).querySelectorAll("button")].forEach(x=>x.classList.remove("active"));
-    b.classList.add("active"); settings[key]=b.dataset.value;
-    if(key==="order"&&settings.order==="shuffled")$("shuffleOptions").checked=true;
-  });
-}
-function buildScope(){
-  const sel=$("scopeSelect");
-  Object.entries(BANK.domains).forEach(([id,name])=>{
-    const count=BANK.scenarios.filter(s=>String(s.domain)===id).length;
-    const o=document.createElement("option");
-    o.value=id;o.textContent=`Domain ${id}: ${name} (${count} scenario${count===1?"":"s"})`;
-    sel.appendChild(o);
-  });
-  sel.addEventListener("change",()=>{
-    const max=sel.value==="all"?12:BANK.scenarios.filter(s=>String(s.domain)===sel.value).length;
-    const options=[...$("scenarioCount").options];
-    options.forEach(o=>o.disabled=Number(o.value)>max);
-    const allowed=options.filter(o=>!o.disabled);
-    if(Number($("scenarioCount").value)>max)$("scenarioCount").value=String(allowed[allowed.length-1]?.value||max);
-  });
-}
-function prepareScenarios(customIds=null){
-  let pool=clone(BANK.scenarios);
-  const scope=$("scopeSelect").value;
-  if(customIds) pool=pool.filter(s=>customIds.includes(s.id));
-  else if(scope!=="all") pool=pool.filter(s=>String(s.domain)===scope);
-  if(settings.order==="domain") pool.sort((a,b)=>a.domain-b.domain||a.id.localeCompare(b.id));
-  else pool=shuffle(pool);
-  const requested=customIds?pool.length:Math.min(Number($("scenarioCount").value),pool.length);
-  pool=pool.slice(0,requested);
-  const randomise=$("shuffleOptions").checked||settings.order==="shuffled";
-  if(randomise){
-    pool.forEach(sc=>sc.questions.forEach(q=>{
-      const packed=q.options.map((text,index)=>({text,correct:index===q.answer}));
-      const mixed=shuffle(packed);
-      q.options=mixed.map(x=>x.text);q.answer=mixed.findIndex(x=>x.correct);
-    }));
-  }
-  return pool;
-}
-function startSession(customIds=null){
-  const list=prepareScenarios(customIds);
-  if(!list.length){alert("No scenarios match this selection.");return}
-  state={
-    scenarios:list,current:0,mode:settings.mode,order:settings.order,
-    responses:{},flags:{},checked:{},startedAt:Date.now(),
-    duration:customIds?0:Math.max(0,Number($("minutes").value)||0)*60,
-    finished:false
-  };
-  remaining=state.duration;
-  saveActive();
-  showScreen("sessionScreen");
-  startTimer();
-  renderScenario();
-}
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function paragraphs(text){return text.split(/\n\s*\n/).filter(Boolean).map(p=>`<p>${escapeHtml(p.trim())}</p>`).join("")}
+function showScreen(name){["homeScreen","sessionScreen","resultScreen"].forEach(id=>$(id).classList.toggle("hidden",id!==name));window.scrollTo({top:0,behavior:"smooth"})}
+function setSegment(id,key){$(id).addEventListener("click",e=>{const b=e.target.closest("button[data-value]");if(!b)return;[...$(id).querySelectorAll("button")].forEach(x=>x.classList.remove("active"));b.classList.add("active");settings[key]=b.dataset.value;if(key==="order"&&settings.order==="shuffled")$("shuffleOptions").checked=true;updateCaseRotationStatus()})}
+function caseScope(){return $("scopeSelect").value||"all"}
+function rotationKey(scope){return `${STORAGE_ROTATION}:${scope}`}
+function getCaseStats(){try{return JSON.parse(localStorage.getItem(STORAGE_STATS)||"{}")}catch{return{}}}
+function saveCaseStats(x){localStorage.setItem(STORAGE_STATS,JSON.stringify(x))}
+function eligibleScenarios(){let pool=clone(BANK.scenarios);const scope=caseScope();if(scope!=="all")pool=pool.filter(s=>String(s.domain)===scope);return pool}
+function getCaseRotation(scope,ids){let r;try{r=JSON.parse(localStorage.getItem(rotationKey(scope))||"null")}catch{}if(!r||!Array.isArray(r.seen))r={cycle:1,seen:[],startedAt:Date.now()};const valid=new Set(ids);r.seen=[...new Set(r.seen.filter(id=>valid.has(id)))];r.cycle=Math.max(1,Number(r.cycle)||1);return r}
+function saveCaseRotation(scope,r){localStorage.setItem(rotationKey(scope),JSON.stringify(r))}
+function caseWeakness(sc,stats){const s=stats[sc.id]||{},attempts=Number(s.attempts)||0,correct=Number(s.correct)||0,total=Number(s.total)||0,flagged=Number(s.flagged)||0;const missRate=total?1-correct/total:0;const recency=s.lastSeen?Math.min(2,(Date.now()-s.lastSeen)/(1000*60*60*24*30)):2;return missRate*8+Math.min(flagged,4)*1.5+recency+Math.random()*1.8}
+function adaptiveCaseOrder(pool){const stats=getCaseStats();return [...pool].sort((a,b)=>caseWeakness(b,stats)-caseWeakness(a,stats))}
+function chooseCases(pool,n){const chosen=adaptiveCaseOrder(pool).slice(0,n);return settings.order==="domain"?chosen.sort((a,b)=>a.domain-b.domain||a.id.localeCompare(b.id)):shuffle(chosen)}
+function selectCasesWithRotation(pool,count){const scope=caseScope(),ids=pool.map(s=>s.id);let r=getCaseRotation(scope,ids),selected=[];const remainingPool=pool.filter(s=>!r.seen.includes(s.id));const first=chooseCases(remainingPool,Math.min(count,remainingPool.length));selected.push(...first);r.seen.push(...first.map(s=>s.id));if(selected.length<count){r={cycle:r.cycle+1,seen:[],startedAt:Date.now()};const candidates=pool.filter(s=>!selected.some(x=>x.id===s.id));const extra=chooseCases(candidates,Math.min(count-selected.length,candidates.length));selected.push(...extra);r.seen.push(...extra.map(s=>s.id))}r.seen=[...new Set(r.seen)];saveCaseRotation(scope,r);return settings.order==="domain"?selected.sort((a,b)=>a.domain-b.domain||a.id.localeCompare(b.id)):shuffle(selected)}
+function updateCaseRotationStatus(){if(!$("caseRotationText"))return;const pool=eligibleScenarios(),scope=caseScope(),r=getCaseRotation(scope,pool.map(s=>s.id)),total=pool.length,seen=r.seen.length,rem=Math.max(0,total-seen),pct=total?Math.round(seen/total*100):0;$("caseRotationCycle").textContent=`Cycle ${r.cycle}`;$("caseRotationBar").style.width=`${pct}%`;$("caseRotationText").textContent=$("smartRotation").checked?`${rem} unseen of ${total} eligible scenarios remain. After exhaustion, Cycle ${r.cycle+1} starts automatically and weaker or flagged cases are prioritised.`:`Smart rotation is off. Smaller sessions may repeat scenarios across attempts.`}
+function resetCaseRotation(){const scope=caseScope();if(!confirm("Reset the current no-repeat scenario rotation for this scope?"))return;localStorage.removeItem(rotationKey(scope));updateCaseRotationStatus()}
+function resetCaseLearning(){if(!confirm("Reset all scenario rotations and adaptive performance history? Completed-session history will remain."))return;try{for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i);if(k&&k.startsWith(STORAGE_ROTATION+":"))localStorage.removeItem(k)}}catch{}localStorage.removeItem(STORAGE_STATS);updateCaseRotationStatus()}
+function buildScope(){const sel=$("scopeSelect");Object.entries(BANK.domains).forEach(([id,name])=>{const count=BANK.scenarios.filter(s=>String(s.domain)===id).length;const o=document.createElement("option");o.value=id;o.textContent=`Domain ${id}: ${name} (${count} scenario${count===1?"":"s"})`;sel.appendChild(o)});sel.addEventListener("change",()=>{const max=sel.value==="all"?12:BANK.scenarios.filter(s=>String(s.domain)===sel.value).length;const options=[...$("scenarioCount").options];options.forEach(o=>o.disabled=Number(o.value)>max);const allowed=options.filter(o=>!o.disabled);if(Number($("scenarioCount").value)>max)$("scenarioCount").value=String(allowed[allowed.length-1]?.value||max);updateCaseRotationStatus()})}
+function prepareScenarios(customIds=null){let pool=eligibleScenarios();if(customIds)pool=pool.filter(s=>customIds.includes(s.id));const requested=customIds?pool.length:Math.min(Number($("scenarioCount").value),pool.length);if(!customIds&&$("smartRotation").checked)pool=selectCasesWithRotation(pool,requested);else{if(settings.order==="domain")pool.sort((a,b)=>a.domain-b.domain||a.id.localeCompare(b.id));else pool=shuffle(pool);pool=pool.slice(0,requested)}const randomise=$("shuffleOptions").checked||settings.order==="shuffled";if(randomise)pool.forEach(sc=>sc.questions.forEach(q=>{const packed=q.options.map((text,index)=>({text,correct:index===q.answer}));const mixed=shuffle(packed);q.options=mixed.map(x=>x.text);q.answer=mixed.findIndex(x=>x.correct)}));return pool}
+function startSession(customIds=null){const list=prepareScenarios(customIds);if(!list.length){alert("No scenarios match this selection.");return}state={scenarios:list,current:0,mode:settings.mode,order:settings.order,responses:{},flags:{},checked:{},startedAt:Date.now(),duration:customIds?0:Math.max(0,Number($("minutes").value)||0)*60,finished:false};remaining=state.duration;saveActive();updateCaseRotationStatus();showScreen("sessionScreen");startTimer();renderScenario()}
 function responseKey(si,qi){return `${si}:${qi}`}
-function renderScenario(){
-  if(!state)return;
-  const si=state.current,sc=state.scenarios[si];
-  $("scenarioNumber").textContent=`Scenario ${si+1} of ${state.scenarios.length}`;
-  $("scenarioDomain").textContent=`Domain ${sc.domain}`;
-  $("scenarioTitle").textContent=sc.title;
-  $("scenarioCopy").innerHTML=paragraphs(sc.text);
-  $("scenarioCopy").classList.remove("hidden");
-  $("collapseScenarioBtn").textContent="Collapse scenario";
-  $("scenarioFlag").classList.toggle("hidden",!state.flags[si]);
-  $("flagBtn").textContent=state.flags[si]?"Unflag scenario":"Flag scenario";
-  $("prevBtn").disabled=si===0;
-  $("nextBtn").disabled=si===state.scenarios.length-1;
-  const checked=!!state.checked[si];
-  $("submitScenarioBtn").classList.toggle("hidden",state.mode==="exam"||checked);
-  $("nextBtn").classList.toggle("hidden",state.mode==="study"&&!checked);
-  $("finishBtn").classList.toggle("hidden",state.mode==="study"&&si<state.scenarios.length-1&&!checked);
-
-  const wrap=$("questions");wrap.innerHTML="";
-  sc.questions.forEach((q,qi)=>{
-    const key=responseKey(si,qi);
-    const selected=state.responses[key];
-    const reveal=state.mode==="study"&&checked;
-    const card=document.createElement("section");
-    card.className="question-card"+(selected!==undefined?" answered":"");
-    if(reveal)card.classList.add(selected===q.answer?"correct":"incorrect");
-    card.innerHTML=`
-      <div class="q-kicker"><span class="q-num">Question ${si*5+qi+1} • Case question ${qi+1} of 5</span>${selected!==undefined?'<span class="pill success">Answered</span>':""}</div>
-      <h3 class="q-text">${escapeHtml(q.q)}</h3>
-      <div class="option-list"></div>
-      <div class="feedback-slot"></div>`;
-    const list=card.querySelector(".option-list");
-    q.options.forEach((opt,oi)=>{
-      const b=document.createElement("button");b.type="button";
-      b.className="option"+(selected===oi?" selected":"");
-      if(reveal&&oi===q.answer)b.classList.add("correct-answer");
-      if(reveal&&selected===oi&&selected!==q.answer)b.classList.add("wrong-answer");
-      b.disabled=reveal;
-      b.innerHTML=`<span class="letter">${LETTERS[oi]}</span><span>${escapeHtml(opt)}</span>`;
-      b.addEventListener("click",()=>selectAnswer(qi,oi));
-      list.appendChild(b);
-    });
-    if(reveal){
-      const good=selected===q.answer;
-      card.querySelector(".feedback-slot").innerHTML=`
-        <div class="feedback ${good?"good":"bad"}">
-          <strong>${good?"Correct":"Incorrect"}. Best answer: ${LETTERS[q.answer]}</strong>
-          <p>${escapeHtml(q.rationale)}</p>
-          <div class="ref"><strong>Principal reference:</strong> ${escapeHtml(q.ref)}</div>
-        </div>`;
-    }
-    wrap.appendChild(card);
-  });
-  focusedQuestion=0;
-  renderSidebar();
-  updateHeader();
-  saveActive();
-}
-function selectAnswer(qi,oi){
-  if(!state||state.finished)return;
-  if(state.mode==="study"&&state.checked[state.current])return;
-  state.responses[responseKey(state.current,qi)]=oi;
-  focusedQuestion=qi;
-  renderScenario();
-}
-function checkScenario(){
-  const si=state.current;
-  const unanswered=state.scenarios[si].questions.filter((_,qi)=>state.responses[responseKey(si,qi)]===undefined).length;
-  if(unanswered&& !confirm(`${unanswered} question${unanswered===1?" is":"s are"} unanswered. Check the scenario anyway?`))return;
-  state.checked[si]=true;renderScenario();
-}
-function go(delta){
-  const next=state.current+delta;
-  if(next<0||next>=state.scenarios.length)return;
-  if(state.mode==="study"&&!state.checked[state.current]){
-    alert("Check this scenario before moving on in Study mode.");return;
-  }
-  state.current=next;renderScenario();
-}
-function renderSidebar(){
-  const total=state.scenarios.length*5;
-  const answered=Object.values(state.responses).filter(v=>v!==undefined).length;
-  const flagged=Object.values(state.flags).filter(Boolean).length;
-  $("answeredCount").textContent=answered;
-  $("flaggedCount").textContent=flagged;
-  $("progressBar").style.width=`${Math.round(answered/total*100)}%`;
-  $("progressText").textContent=`${answered} of ${total} questions answered`;
-  const nav=$("scenarioNav");nav.innerHTML="";
-  state.scenarios.forEach((sc,i)=>{
-    const count=sc.questions.filter((_,qi)=>state.responses[responseKey(i,qi)]!==undefined).length;
-    const b=document.createElement("button");b.type="button";
-    b.className="nav-s"+(i===state.current?" current":"")+(count===5?" complete":"")+(state.flags[i]?" flagged":"");
-    b.textContent=`${i+1} (${count}/5)`;
-    b.title=sc.title;
-    b.addEventListener("click",()=>{
-      if(state.mode==="study"&&!state.checked[state.current]&&i!==state.current){alert("Check this scenario before navigating away in Study mode.");return}
-      state.current=i;renderScenario();
-    });
-    nav.appendChild(b);
-  });
-}
-function toggleFlag(){
-  state.flags[state.current]=!state.flags[state.current];renderScenario();
-}
-function toggleScenario(){
-  const hidden=$("scenarioCopy").classList.toggle("hidden");
-  $("collapseScenarioBtn").textContent=hidden?"Expand scenario":"Collapse scenario";
-}
-function startTimer(){
-  clearInterval(timerId);
-  if(!state.duration){$("timer").textContent="Untimed";return}
-  const elapsed=Math.floor((Date.now()-state.startedAt)/1000);
-  remaining=Math.max(0,state.duration-elapsed);
-  updateTimer();
-  timerId=setInterval(()=>{remaining--;updateTimer();if(remaining<=0){clearInterval(timerId);finishSession(true)}},1000);
-}
-function updateTimer(){
-  const m=Math.floor(remaining/60),s=remaining%60;
-  $("timer").textContent=`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
-  $("timer").classList.toggle("low",remaining<=300);
-}
-function finishSession(timedOut=false){
-  if(!state||state.finished)return;
-  const total=state.scenarios.length*5;
-  const answered=Object.values(state.responses).filter(v=>v!==undefined).length;
-  if(!timedOut&&answered<total&&!confirm(`${total-answered} questions are unanswered. Finish the session?`))return;
-  clearInterval(timerId);state.finished=true;state.finishedAt=Date.now();saveActive();
-  renderResults(timedOut);
-}
-function scoreState(){
-  let correct=0;const byDomain={};
-  state.scenarios.forEach((sc,si)=>{
-    byDomain[sc.domain]??={correct:0,total:0};
-    sc.questions.forEach((q,qi)=>{
-      byDomain[sc.domain].total++;
-      if(state.responses[responseKey(si,qi)]===q.answer){correct++;byDomain[sc.domain].correct++}
-    });
-  });
-  return {correct,total:state.scenarios.length*5,byDomain};
-}
-function renderResults(timedOut=false){
-  const result=scoreState(),pct=Math.round(result.correct/result.total*100);
-  $("scorePercent").textContent=`${pct}%`;
-  $("scoreFraction").textContent=`${result.correct} of ${result.total}`;
-  $("scoreRing").style.setProperty("--score",`${pct*3.6}deg`);
-  const descriptor=pct>=80?"Strong performance":pct>=70?"Developing readiness":pct>=60?"Targeted revision recommended":"Substantial revision recommended";
-  $("resultSummary").textContent=`${descriptor}. You completed ${state.scenarios.length} scenarios${timedOut?" and the timer expired":""}.`;
-  const rows=$("domainRows");rows.innerHTML="";
-  Object.entries(result.byDomain).sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([d,v])=>{
-    const p=Math.round(v.correct/v.total*100);
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td><strong>Domain ${d}</strong><div style="font-size:12px;color:var(--muted)">${escapeHtml(BANK.domains[d])}</div></td>
-      <td>${v.correct}/${v.total} (${p}%)</td>
-      <td><div class="bar"><span style="width:${p}%"></span></div></td>`;
-    rows.appendChild(tr);
-  });
-  saveHistory(pct,result.correct,result.total);
-  $("reviewSection").classList.add("hidden");
-  showScreen("resultScreen");
-  $("headerStatus").textContent=`Result: ${pct}%`;
-  localStorage.removeItem(STORAGE_ACTIVE);
-}
-function renderReview(missedOnly=true){
-  const list=$("reviewList");list.innerHTML="";
-  state.scenarios.forEach((sc,si)=>{
-    sc.questions.forEach((q,qi)=>{
-      const selected=state.responses[responseKey(si,qi)];
-      const correct=selected===q.answer;
-      if(missedOnly&&correct)return;
-      const card=document.createElement("article");card.className="card review-card";
-      card.innerHTML=`
-        <div class="q-kicker"><span class="pill">Scenario ${si+1}</span><span class="pill domain">Domain ${sc.domain}</span></div>
-        <h4>${escapeHtml(q.q)}</h4>
-        <details><summary style="cursor:pointer;font-weight:750">Show case context</summary><div class="review-scenario">${paragraphs(sc.text)}</div></details>
-        <div class="review-answer ${correct?"":"user-wrong"}"><strong>Your answer:</strong> ${selected===undefined?"Unanswered":`${LETTERS[selected]}. ${escapeHtml(q.options[selected])}`}</div>
-        <div class="review-answer correct-answer"><strong>Best answer:</strong> ${LETTERS[q.answer]}. ${escapeHtml(q.options[q.answer])}</div>
-        <div class="explanation"><p><strong>Why:</strong> ${escapeHtml(q.rationale)}</p><p><strong>Principal reference:</strong> ${escapeHtml(q.ref)}</p></div>`;
-      list.appendChild(card);
-    });
-  });
-  if(!list.children.length)list.innerHTML='<div class="empty">No missed questions. Excellent work.</div>';
-  $("reviewSection").classList.remove("hidden");
-  $("reviewSection").scrollIntoView({behavior:"smooth"});
-}
-function retakeMissed(){
-  const ids=[];
-  state.scenarios.forEach((sc,si)=>{
-    const missed=sc.questions.some((q,qi)=>state.responses[responseKey(si,qi)]!==q.answer);
-    if(missed)ids.push(sc.id);
-  });
-  if(!ids.length){alert("There are no missed scenarios to retake.");return}
-  settings.mode="study";settings.order="shuffled";startSession(ids);
-}
-function saveHistory(pct,correct,total){
-  const h=JSON.parse(localStorage.getItem(STORAGE_HISTORY)||"[]");
-  h.unshift({date:new Date().toISOString(),pct,correct,total,scenarios:state.scenarios.length,mode:state.mode,order:state.order});
-  localStorage.setItem(STORAGE_HISTORY,JSON.stringify(h.slice(0,8)));renderHistory();
-}
-function renderHistory(){
-  const h=JSON.parse(localStorage.getItem(STORAGE_HISTORY)||"[]");
-  const box=$("history");box.innerHTML="";
-  if(!h.length){box.innerHTML='<div class="empty">No completed sessions yet.</div>';return}
-  h.forEach(x=>{
-    const d=document.createElement("div");d.className="history-item";
-    d.innerHTML=`<div class="history-top"><span>${x.scenarios} scenarios • ${x.mode==="study"?"Study":"Exam"}</span><span>${x.pct}%</span></div>
-      <div class="history-meta">${new Date(x.date).toLocaleString("en-AU")} • ${x.correct}/${x.total} correct • ${x.order==="domain"?"By domain":"Shuffled"}</div>`;
-    box.appendChild(d);
-  });
-}
+function renderScenario(){if(!state)return;const si=state.current,sc=state.scenarios[si];$("scenarioNumber").textContent=`Scenario ${si+1} of ${state.scenarios.length}`;$("scenarioDomain").textContent=`Domain ${sc.domain}`;$("scenarioTitle").textContent=sc.title;$("scenarioCopy").innerHTML=paragraphs(sc.text);$("scenarioCopy").classList.remove("hidden");$("collapseScenarioBtn").textContent="Collapse scenario";$("scenarioFlag").classList.toggle("hidden",!state.flags[si]);$("flagBtn").textContent=state.flags[si]?"Unflag scenario":"Flag scenario";$("prevBtn").disabled=si===0;$("nextBtn").disabled=si===state.scenarios.length-1;const checked=!!state.checked[si];$("submitScenarioBtn").classList.toggle("hidden",state.mode==="exam"||checked);$("nextBtn").classList.toggle("hidden",state.mode==="study"&&!checked);$("finishBtn").classList.toggle("hidden",state.mode==="study"&&si<state.scenarios.length-1&&!checked);const wrap=$("questions");wrap.innerHTML="";sc.questions.forEach((q,qi)=>{const key=responseKey(si,qi),selected=state.responses[key],reveal=state.mode==="study"&&checked;const card=document.createElement("section");card.className="question-card"+(selected!==undefined?" answered":"");if(reveal)card.classList.add(selected===q.answer?"correct":"incorrect");card.innerHTML=`<div class="q-kicker"><span class="q-num">Question ${si*5+qi+1} • Case question ${qi+1} of 5</span>${selected!==undefined?'<span class="pill success">Answered</span>':""}</div><h3 class="q-text">${escapeHtml(q.q)}</h3><div class="option-list"></div><div class="feedback-slot"></div>`;const list=card.querySelector(".option-list");q.options.forEach((opt,oi)=>{const b=document.createElement("button");b.type="button";b.className="option"+(selected===oi?" selected":"");if(reveal&&oi===q.answer)b.classList.add("correct-answer");if(reveal&&selected===oi&&selected!==q.answer)b.classList.add("wrong-answer");b.disabled=reveal;b.innerHTML=`<span class="letter">${LETTERS[oi]}</span><span>${escapeHtml(opt)}</span>`;b.addEventListener("click",()=>selectAnswer(qi,oi));list.appendChild(b)});if(reveal){const good=selected===q.answer;card.querySelector(".feedback-slot").innerHTML=`<div class="feedback ${good?"good":"bad"}"><strong>${good?"Correct":"Incorrect"}. Best answer: ${LETTERS[q.answer]}</strong><p>${escapeHtml(q.rationale)}</p><div class="ref"><strong>Principal reference:</strong> ${escapeHtml(q.ref)}</div></div>`}wrap.appendChild(card)});focusedQuestion=0;renderSidebar();updateHeader();saveActive()}
+function selectAnswer(qi,oi){if(!state||state.finished)return;if(state.mode==="study"&&state.checked[state.current])return;state.responses[responseKey(state.current,qi)]=oi;focusedQuestion=qi;renderScenario()}
+function checkScenario(){const si=state.current,unanswered=state.scenarios[si].questions.filter((_,qi)=>state.responses[responseKey(si,qi)]===undefined).length;if(unanswered&&!confirm(`${unanswered} question${unanswered===1?" is":"s are"} unanswered. Check the scenario anyway?`))return;state.checked[si]=true;renderScenario()}
+function go(delta){const next=state.current+delta;if(next<0||next>=state.scenarios.length)return;if(state.mode==="study"&&!state.checked[state.current]){alert("Check this scenario before moving on in Study mode.");return}state.current=next;renderScenario()}
+function renderSidebar(){const total=state.scenarios.length*5,answered=Object.values(state.responses).filter(v=>v!==undefined).length,flagged=Object.values(state.flags).filter(Boolean).length;$("answeredCount").textContent=answered;$("flaggedCount").textContent=flagged;$("progressBar").style.width=`${Math.round(answered/total*100)}%`;$("progressText").textContent=`${answered} of ${total} questions answered`;const nav=$("scenarioNav");nav.innerHTML="";state.scenarios.forEach((sc,i)=>{const count=sc.questions.filter((_,qi)=>state.responses[responseKey(i,qi)]!==undefined).length,b=document.createElement("button");b.type="button";b.className="nav-s"+(i===state.current?" current":"")+(count===5?" complete":"")+(state.flags[i]?" flagged":"");b.textContent=`${i+1} (${count}/5)`;b.title=sc.title;b.addEventListener("click",()=>{if(state.mode==="study"&&!state.checked[state.current]&&i!==state.current){alert("Check this scenario before navigating away in Study mode.");return}state.current=i;renderScenario()});nav.appendChild(b)})}
+function toggleFlag(){state.flags[state.current]=!state.flags[state.current];renderScenario()}
+function toggleScenario(){const hidden=$("scenarioCopy").classList.toggle("hidden");$("collapseScenarioBtn").textContent=hidden?"Expand scenario":"Collapse scenario"}
+function startTimer(){clearInterval(timerId);if(!state.duration){$("timer").textContent="Untimed";return}const elapsed=Math.floor((Date.now()-state.startedAt)/1000);remaining=Math.max(0,state.duration-elapsed);updateTimer();timerId=setInterval(()=>{remaining--;updateTimer();if(remaining<=0){clearInterval(timerId);finishSession(true)}},1000)}
+function updateTimer(){const m=Math.floor(remaining/60),s=remaining%60;$("timer").textContent=`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;$("timer").classList.toggle("low",remaining<=300)}
+function updateScenarioStats(){const stats=getCaseStats(),now=Date.now();state.scenarios.forEach((sc,si)=>{let correct=0;sc.questions.forEach((q,qi)=>{if(state.responses[responseKey(si,qi)]===q.answer)correct++});const s=stats[sc.id]||{attempts:0,correct:0,total:0,flagged:0};s.attempts++;s.correct+=correct;s.total+=sc.questions.length;s.flagged=Math.max(0,Math.min(6,(Number(s.flagged)||0)+(state.flags[si]?1:-0.25)));s.lastSeen=now;stats[sc.id]=s});saveCaseStats(stats)}
+function finishSession(timedOut=false){if(!state||state.finished)return;const total=state.scenarios.length*5,answered=Object.values(state.responses).filter(v=>v!==undefined).length;if(!timedOut&&answered<total&&!confirm(`${total-answered} questions are unanswered. Finish the session?`))return;clearInterval(timerId);state.finished=true;state.finishedAt=Date.now();updateScenarioStats();saveActive();renderResults(timedOut)}
+function scoreState(){let correct=0;const byDomain={};state.scenarios.forEach((sc,si)=>{byDomain[sc.domain]??={correct:0,total:0};sc.questions.forEach((q,qi)=>{byDomain[sc.domain].total++;if(state.responses[responseKey(si,qi)]===q.answer){correct++;byDomain[sc.domain].correct++}})});return{correct,total:state.scenarios.length*5,byDomain}}
+function renderResults(timedOut=false){const result=scoreState(),pct=Math.round(result.correct/result.total*100);$("scorePercent").textContent=`${pct}%`;$("scoreFraction").textContent=`${result.correct} of ${result.total}`;$("scoreRing").style.setProperty("--score",`${pct*3.6}deg`);const descriptor=pct>=80?"Strong performance":pct>=70?"Developing readiness":pct>=60?"Targeted revision recommended":"Substantial revision recommended";$("resultSummary").textContent=`${descriptor}. You completed ${state.scenarios.length} scenarios${timedOut?" and the timer expired":""}.`;const rows=$("domainRows");rows.innerHTML="";Object.entries(result.byDomain).sort((a,b)=>Number(a[0])-Number(b[0])).forEach(([d,v])=>{const p=Math.round(v.correct/v.total*100),tr=document.createElement("tr");tr.innerHTML=`<td><strong>Domain ${d}</strong><div style="font-size:12px;color:var(--muted)">${escapeHtml(BANK.domains[d])}</div></td><td>${v.correct}/${v.total} (${p}%)</td><td><div class="bar"><span style="width:${p}%"></span></div></td>`;rows.appendChild(tr)});saveHistory(pct,result.correct,result.total);$("reviewSection").classList.add("hidden");showScreen("resultScreen");$("headerStatus").textContent=`Result: ${pct}%`;localStorage.removeItem(STORAGE_ACTIVE);updateCaseRotationStatus()}
+function renderReview(missedOnly=true){const list=$("reviewList");list.innerHTML="";state.scenarios.forEach((sc,si)=>{sc.questions.forEach((q,qi)=>{const selected=state.responses[responseKey(si,qi)],correct=selected===q.answer;if(missedOnly&&correct)return;const card=document.createElement("article");card.className="card review-card";card.innerHTML=`<div class="q-kicker"><span class="pill">Scenario ${si+1}</span><span class="pill domain">Domain ${sc.domain}</span></div><h4>${escapeHtml(q.q)}</h4><details><summary style="cursor:pointer;font-weight:750">Show case context</summary><div class="review-scenario">${paragraphs(sc.text)}</div></details><div class="review-answer ${correct?"":"user-wrong"}"><strong>Your answer:</strong> ${selected===undefined?"Unanswered":`${LETTERS[selected]}. ${escapeHtml(q.options[selected])}`}</div><div class="review-answer correct-answer"><strong>Best answer:</strong> ${LETTERS[q.answer]}. ${escapeHtml(q.options[q.answer])}</div><div class="explanation"><p><strong>Why:</strong> ${escapeHtml(q.rationale)}</p><p><strong>Principal reference:</strong> ${escapeHtml(q.ref)}</p></div>`;list.appendChild(card)})});if(!list.children.length)list.innerHTML='<div class="empty">No missed questions. Excellent work.</div>';$("reviewSection").classList.remove("hidden");$("reviewSection").scrollIntoView({behavior:"smooth"})}
+function retakeMissed(){const ids=[];state.scenarios.forEach((sc,si)=>{const missed=sc.questions.some((q,qi)=>state.responses[responseKey(si,qi)]!==q.answer);if(missed)ids.push(sc.id)});if(!ids.length){alert("There are no missed scenarios to retake.");return}settings.mode="study";settings.order="shuffled";startSession(ids)}
+function saveHistory(pct,correct,total){const h=JSON.parse(localStorage.getItem(STORAGE_HISTORY)||"[]");h.unshift({date:new Date().toISOString(),pct,correct,total,scenarios:state.scenarios.length,mode:state.mode,order:state.order});localStorage.setItem(STORAGE_HISTORY,JSON.stringify(h.slice(0,8)));renderHistory()}
+function renderHistory(){const h=JSON.parse(localStorage.getItem(STORAGE_HISTORY)||"[]"),box=$("history");box.innerHTML="";if(!h.length){box.innerHTML='<div class="empty">No completed sessions yet.</div>';return}h.forEach(x=>{const d=document.createElement("div");d.className="history-item";d.innerHTML=`<div class="history-top"><span>${x.scenarios} scenarios • ${x.mode==="study"?"Study":"Exam"}</span><span>${x.pct}%</span></div><div class="history-meta">${new Date(x.date).toLocaleString("en-AU")} • ${x.correct}/${x.total} correct • ${x.order==="domain"?"By domain":"Shuffled"}</div>`;box.appendChild(d)})}
 function saveActive(){if(state&&!state.finished)localStorage.setItem(STORAGE_ACTIVE,JSON.stringify(state))}
-function updateHeader(){$("headerStatus").textContent=state?`Scenario ${state.current+1}/${state.scenarios.length}`:"Set 4 scenario bank"}
-function goHome(){
-  if(state&&!state.finished&& !confirm("Leave this session? Your current progress will remain saved in this browser."))return;
-  clearInterval(timerId);showScreen("homeScreen");renderHistory();$("headerStatus").textContent="Set 4 scenario bank";
-}
-function wire(){
-  setSegment("orderSeg","order");setSegment("modeSeg","mode");buildScope();renderHistory();
-  $("startBtn").addEventListener("click",()=>startSession());
-  $("clearHistoryBtn").addEventListener("click",()=>{if(confirm("Clear saved result history?")){localStorage.removeItem(STORAGE_HISTORY);renderHistory()}});
-  $("homeBtn").addEventListener("click",goHome);
-  $("prevBtn").addEventListener("click",()=>go(-1));$("nextBtn").addEventListener("click",()=>go(1));
-  $("flagBtn").addEventListener("click",toggleFlag);$("collapseScenarioBtn").addEventListener("click",toggleScenario);
-  $("submitScenarioBtn").addEventListener("click",checkScenario);$("finishBtn").addEventListener("click",()=>finishSession(false));
-  $("mobileNavToggle").addEventListener("click",()=>$("sideCard").classList.toggle("collapsed"));
-  $("reviewMissedBtn").addEventListener("click",()=>renderReview(true));$("retakeMissedBtn").addEventListener("click",retakeMissed);
-  $("printBtn").addEventListener("click",()=>window.print());$("newSessionBtn").addEventListener("click",()=>{state=null;showScreen("homeScreen");renderHistory()});
-  document.addEventListener("keydown",e=>{
-    if($("sessionScreen").classList.contains("hidden")||!state)return;
-    if(["1","2","3"].includes(e.key)){selectAnswer(focusedQuestion,Number(e.key)-1)}
-    else if(e.key.toLowerCase()==="f")toggleFlag();
-  });
-  const active=localStorage.getItem(STORAGE_ACTIVE);
-  if(active){
-    try{
-      const saved=JSON.parse(active);
-      if(saved&&!saved.finished&&saved.scenarios?.length&&confirm("Resume your saved case-study session?")){
-        state=saved;remaining=state.duration;showScreen("sessionScreen");startTimer();renderScenario();
-      }
-    }catch(_){}
-  }
-}
+function updateHeader(){$("headerStatus").textContent=state?`Scenario ${state.current+1}/${state.scenarios.length}`:"Set 4 scenario bank • smart rotation"}
+function goHome(){if(state&&!state.finished&&!confirm("Leave this session? Your current progress will remain saved in this browser."))return;clearInterval(timerId);showScreen("homeScreen");renderHistory();$("headerStatus").textContent="Set 4 scenario bank • smart rotation";updateCaseRotationStatus()}
+function wire(){setSegment("orderSeg","order");setSegment("modeSeg","mode");buildScope();renderHistory();$("smartRotation").addEventListener("change",updateCaseRotationStatus);$("resetCaseRotation").addEventListener("click",resetCaseRotation);$("resetCaseLearning").addEventListener("click",resetCaseLearning);$("startBtn").addEventListener("click",()=>startSession());$("clearHistoryBtn").addEventListener("click",()=>{if(confirm("Clear saved result history?")){localStorage.removeItem(STORAGE_HISTORY);renderHistory()}});$("homeBtn").addEventListener("click",goHome);$("prevBtn").addEventListener("click",()=>go(-1));$("nextBtn").addEventListener("click",()=>go(1));$("flagBtn").addEventListener("click",toggleFlag);$("collapseScenarioBtn").addEventListener("click",toggleScenario);$("submitScenarioBtn").addEventListener("click",checkScenario);$("finishBtn").addEventListener("click",()=>finishSession(false));$("mobileNavToggle").addEventListener("click",()=>$("sideCard").classList.toggle("collapsed"));$("reviewMissedBtn").addEventListener("click",()=>renderReview(true));$("retakeMissedBtn").addEventListener("click",retakeMissed);$("printBtn").addEventListener("click",()=>window.print());$("newSessionBtn").addEventListener("click",()=>{state=null;showScreen("homeScreen");renderHistory();updateCaseRotationStatus()});document.addEventListener("keydown",e=>{if($("sessionScreen").classList.contains("hidden")||!state)return;if(["1","2","3"].includes(e.key))selectAnswer(focusedQuestion,Number(e.key)-1);else if(e.key.toLowerCase()==="f")toggleFlag()});const active=localStorage.getItem(STORAGE_ACTIVE);if(active){try{const saved=JSON.parse(active);if(saved&&!saved.finished&&saved.scenarios?.length&&confirm("Resume your saved case-study session?")){state=saved;remaining=state.duration;showScreen("sessionScreen");startTimer();renderScenario()}}catch{}}updateCaseRotationStatus()}
 wire();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
 </script>
