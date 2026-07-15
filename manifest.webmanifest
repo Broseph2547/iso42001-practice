@@ -1,7 +1,7 @@
 {
   "name": "ISO/IEC 42001 Expert Practice",
   "short_name": "42001 Expert",
-  "description": "180 expert-level composite ISO/IEC 42001 Lead Auditor practice questions with smart rotation.",
+  "description": "180 expert-level composite ISO/IEC 42001 Lead Auditor practice questions with smart no-repeat rotation.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,13 +1,12 @@
 # ISO/IEC 42001 Expert Practice App
 
-This package contains 180 expert composite questions from Sets 5, 6 and 7.
-
-The expert scenario text and answer options now use the same sans-serif typeface.
+This package contains 180 expert-level composite questions from Expert Sets 5, 6 and 7.
 
 ## GitHub Pages deployment
 
-1. Extract the ZIP.
-2. Upload every extracted file to the root of the repository.
+1. Extract this ZIP.
+2. Upload all extracted files to the root of a GitHub repository.
 3. Configure GitHub Pages to deploy from `main` and `/(root)`.
-4. Allow several minutes for deployment.
-5. Hard-refresh once so the updated offline cache is installed.
+4. Open the Pages address after deployment.
+
+The app includes smart no-repeat rotation, adaptive revision, Study and Exam modes, domain filtering, missed-question retakes and offline support.
