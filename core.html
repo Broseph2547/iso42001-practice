@@ -180,6 +180,10 @@
       .quiz-footer .btn{width:100%}
       .top-stat{display:none}
       .brand-sub{display:none}
+      .topbar-inner{gap:7px;padding:9px 10px}
+      .top-nav-btn{padding:8px 10px;font-size:13px}
+      .mark{width:38px;height:38px}
+      .brand-title{font-size:13px;max-width:112px}
       .nav-grid{grid-template-columns:repeat(8,1fr)}
       .nav-q{height:34px;font-size:12px}
       .result-hero{padding:20px}
@@ -205,7 +209,8 @@
       </div>
       <div class="topbar-spacer"></div>
       <div id="headerStatus" class="top-stat">240 questions available • smart rotation</div>
-      <button class="btn btn-ghost no-print" id="homeBtn" title="Return home">Home</button>
+      <button class="btn btn-secondary no-print top-nav-btn" id="banksBtn" title="Change test bank">Banks</button>
+      <button class="btn btn-ghost no-print top-nav-btn" id="homeBtn" title="Return to this bank's home screen">Home</button>
     </div>
   </header>
 
@@ -520,7 +525,7 @@ function bindEvents(){
   $('smartRotationToggle').addEventListener('change',updateRotationStatus); $('resetRotationBtn').addEventListener('click',resetCurrentRotation); $('resetLearningBtn').addEventListener('click',resetLearningData);
   $('timerToggle').addEventListener('change',()=> $('minutesField').classList.toggle('hidden',!$('timerToggle').checked));
   $('startBtn').addEventListener('click',startFromForm); $('resumeBtn').addEventListener('click',resumeSaved);
-  $('homeBtn').addEventListener('click',goHome); $('prevBtn').addEventListener('click',()=>moveQuestion(-1)); $('nextBtn').addEventListener('click',()=>moveQuestion(1));
+  $('banksBtn').addEventListener('click',goToSuite); $('homeBtn').addEventListener('click',goHome); $('prevBtn').addEventListener('click',()=>moveQuestion(-1)); $('nextBtn').addEventListener('click',()=>moveQuestion(1));
   $('flagBtn').addEventListener('click',toggleFlag); $('saveExitBtn').addEventListener('click',()=>{saveSession();stopTimer();showScreen('homeScreen');updateRotationStatus()});
   $('submitBtn').addEventListener('click',()=>submitSession(false)); $('navToggle').addEventListener('click',()=> $('sideCard').classList.toggle('collapsed'));
   $('reviewIncorrectBtn').addEventListener('click',()=>renderReview('incorrect')); $('reviewAllBtn').addEventListener('click',()=>renderReview('all'));
@@ -589,6 +594,13 @@ function calculateResults(){
 function renderResults(){const r=lastResult,pass=r.percent>=70;$('scorePercent').textContent=`${r.percent}%`;$('scoreFraction').textContent=`${r.correct} / ${r.total}`;$('scoreRing').style.setProperty('--score',`${r.percent*3.6}deg`);$('resultHeading').textContent=pass?'Target achieved':'Review recommended';const unanswered=r.details.filter(d=>!d.answer).length;$('resultSummary').textContent=`${r.session.setName}, ${r.session.mode==='shuffled'?'shuffled mock':r.session.mode==='missed'?'missed-question revision':'domain-organised'} mode. ${r.correct} correct, ${r.total-r.correct-unanswered} incorrect, ${unanswered} unanswered. Time used: ${fmtTime(r.timeSec)}.`;const domains=[...new Set(r.details.map(d=>d.q.domain))];$('domainResults').innerHTML=domains.map(id=>{const ds=r.details.filter(d=>d.q.domain===id),c=ds.filter(d=>d.ok).length,p=Math.round(c/ds.length*100),title=ds[0].q.domain_title;return `<tr><td><strong>Domain ${id}</strong><br><small>${escapeHtml(title)}</small></td><td>${ds.length} question${ds.length===1?'':'s'}</td><td><strong>${c}/${ds.length}</strong> (${p}%)</td><td><div class="bar"><span style="width:${p}%"></span></div></td></tr>`}).join('');$('reviewSection').classList.add('hidden');$('headerStatus').textContent=`Result: ${r.percent}%`;updateRotationStatus();}
 function renderReview(type){if(!lastResult)return;let list=type==='incorrect'?lastResult.details.filter(d=>!d.ok):lastResult.details;$('reviewTitle').textContent=type==='incorrect'?'Incorrect and unanswered questions':'Full question review';$('reviewList').innerHTML=list.length?list.map(d=>{const q=d.q,answerText=d.answer?q.options[d.answer]:'No answer selected';return `<article class="card review-card"><div class="question-kicker"><span class="pill domain">Domain ${q.domain}</span><span class="pill ${d.ok?'success':'danger'}">${d.ok?'Correct':'Review'}</span>${d.flagged?'<span class="pill flag">Flagged</span>':''}</div><h4>Source Question ${q.id}: ${escapeHtml(q.prompt)}</h4><div class="review-answer ${d.ok?'':'user-wrong'}"><strong>Your answer:</strong> ${escapeHtml(answerText)}</div><div class="review-answer correct-answer"><strong>Correct answer:</strong> ${escapeHtml(q.options[q.correct])}</div><div class="explanation"><p><strong>Rationale:</strong> ${escapeHtml(q.rationale)}</p><p><strong>Study pointer:</strong> ${escapeHtml(q.study_pointer)}</p><p><strong>Exam-writer trap:</strong> ${escapeHtml(q.trap)}</p></div></article>`}).join(''):'<div class="card empty">No incorrect answers. Excellent work.</div>';$('reviewSection').classList.remove('hidden');$('reviewSection').scrollIntoView({behaviour:'smooth'});}
 function retakeMissed(){if(!lastResult)return;const missed=lastResult.details.filter(d=>!d.ok);if(!missed.length){alert('There are no missed questions to retake.');return}const s=lastResult.session;session={id:String(Date.now()),setId:s.setId,setName:s.setName,mode:'missed',feedback:'study',domain:'missed',rotationEnabled:false,items:missed.map(d=>({id:d.q.id,optionOrder:shuffle(['A','B','C','D'])})),answers:{},firstAnswers:{},flagged:[],currentIndex:0,startedAt:Date.now(),timerEnabled:false,durationSec:0,completed:false};saveSession();startQuizUI();}
+function goToSuite(){
+  const active=session&&!session.completed&&!$('quizScreen').classList.contains('hidden');
+  if(active&&!confirm('Return to the test bank selector? Your current attempt will be saved and can be resumed later.'))return;
+  if(active)saveSession();
+  stopTimer();
+  window.location.href='./index.html';
+}
 function goHome(){if(session&&!session.completed&&!$('quizScreen').classList.contains('hidden')){if(!confirm('Save this attempt and return home?'))return;saveSession()}stopTimer();showScreen('homeScreen');$('headerStatus').textContent='240 questions available • smart rotation';updateResume();updateRotationStatus();}
 function handleKeys(e){if($('quizScreen').classList.contains('hidden')||e.target.matches('input,textarea,select'))return;const k=e.key.toUpperCase();if(['A','B','C','D'].includes(k)){const item=currentItem(),orig=item.optionOrder[k.charCodeAt(0)-65];selectAnswer(orig)}else if(e.key==='ArrowRight')moveQuestion(1);else if(e.key==='ArrowLeft')moveQuestion(-1);else if(k==='F')toggleFlag();}
 function openWritten(){const set=getSet($('setSelect').value);showScreen('writtenScreen');$('writtenHeading').textContent=`${set.name}: optional written auditor tasks`;$('headerStatus').textContent='Written practice';$('writtenList').innerHTML=set.written_tasks.map(w=>{const storageKey=`${STORAGE_PREFIX}:written:${set.id}:${w.id}`,saved=store.getItem(storageKey)||'';return `<article class="card written-card"><div class="question-kicker"><span class="pill domain">WT${w.id}</span></div><h3>${escapeHtml(w.title)}</h3><p>${escapeHtml(w.task)}</p><label for="wt-${w.id}">Your response</label><textarea id="wt-${w.id}" data-key="${storageKey}" placeholder="Draft your auditor response here...">${escapeHtml(saved)}</textarea><div class="actions no-print" style="margin-top:10px"><button class="btn btn-secondary reveal-model" data-id="${w.id}">Reveal model answer</button></div><div id="model-${w.id}" class="model-answer hidden"><strong>Model answer</strong><p>${escapeHtml(w.model_answer)}</p></div></article>`}).join('');$('writtenList').oninput=e=>{if(e.target.matches('textarea[data-key]'))store.setItem(e.target.dataset.key,e.target.value)};$('writtenList').onclick=e=>{const b=e.target.closest('.reveal-model');if(b){const p=$(`model-${b.dataset.id}`);p.classList.toggle('hidden');b.textContent=p.classList.contains('hidden')?'Reveal model answer':'Hide model answer'}};}
