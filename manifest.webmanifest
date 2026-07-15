@@ -1,7 +1,7 @@
 {
-  "name": "ISO/IEC 42001 Lead Auditor Complete Practice Suite",
-  "short_name": "42001 Practice",
-  "description": "A 480-question ISO/IEC 42001 Lead Auditor practice suite with core, case-study and expert modes.",
+  "name": "ISO/IEC 42001 Mixed Master Bank",
+  "short_name": "42001 Mixed",
+  "description": "A mixed ISO/IEC 42001 Lead Auditor practice bank combining all 480 core, scenario and expert questions.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
