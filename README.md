@@ -1,16 +1,12 @@
-# ISO/IEC 42001 Lead Auditor Complete Smart Practice Suite
+# ISO/IEC 42001 Expert Practice App
 
-Includes:
-- 240 core questions
-- 12 scenario case studies with 60 linked questions
-- Smart no-repeat rotation
-- Automatic new cycles after exhaustion
-- Adaptive prioritisation of incorrect and flagged questions
-- Separate rotation tracking by question bank and selected domain/scope
+This package contains 180 expert-level composite questions from Expert Sets 5, 6 and 7.
 
-## Update GitHub Pages
+## GitHub Pages deployment
+
 1. Extract this ZIP.
-2. Upload all extracted files to the root of your existing repository.
-3. Replace the existing files.
-4. Keep Pages set to `main` and `/(root)`.
-5. Hard-refresh once after deployment if an older offline version remains cached.
+2. Upload all extracted files to the root of a GitHub repository.
+3. Configure GitHub Pages to deploy from `main` and `/(root)`.
+4. Open the Pages address after deployment.
+
+The app includes smart no-repeat rotation, adaptive revision, Study and Exam modes, domain filtering, missed-question retakes and offline support.

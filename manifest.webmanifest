@@ -1,12 +1,12 @@
 {
-  "name": "ISO/IEC 42001 Lead Auditor Smart Practice Suite",
-  "short_name": "42001 Practice",
-  "description": "300-question practice suite with smart no-repeat rotation and adaptive revision.",
+  "name": "ISO/IEC 42001 Expert Practice",
+  "short_name": "42001 Expert",
+  "description": "180 expert-level composite ISO/IEC 42001 Lead Auditor practice questions with smart no-repeat rotation.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f2f4f7",
-  "theme_color": "#8f1d2c",
+  "theme_color": "#7a1827",
   "icons": [
     {
       "src": "icon-192.png",
