@@ -1,25 +1,13 @@
-# ISO/IEC 42001 Lead Auditor Complete Practice Suite
+# ISO/IEC 42001 Expert Practice App
 
-The suite contains 480 questions:
+This package contains 180 expert composite questions from Sets 5, 6 and 7.
 
-- `core.html`: 240 core questions from Sets 1 to 3
-- `scenarios.html`: 12 case studies with 60 linked questions
-- `expert.html`: 180 expert composite questions from Sets 5 to 7
-- `index.html`: launcher for all three apps
+The expert scenario text and answer options now use the same sans-serif typeface.
 
-## Update an existing GitHub Pages repository
+## GitHub Pages deployment
 
-1. Extract this ZIP.
-2. Upload every extracted file to the root of your existing repository.
-3. Replace the existing files when prompted.
-4. Keep GitHub Pages configured for `main` and `/(root)`.
-5. After deployment, perform one hard refresh to activate the new cache:
-   - macOS: Command + Shift + R
-   - Windows: Ctrl + Shift + R
-
-Each app stores its own rotation and learning data locally in the browser.
-
-
-## Navigation update
-
-Every test bank now has a persistent **Banks** button in the top navigation. It returns to the suite selector from Safari, an installed iPhone web app, or a desktop browser. An active attempt is saved before switching banks and can be resumed later.
+1. Extract the ZIP.
+2. Upload every extracted file to the root of the repository.
+3. Configure GitHub Pages to deploy from `main` and `/(root)`.
+4. Allow several minutes for deployment.
+5. Hard-refresh once so the updated offline cache is installed.
