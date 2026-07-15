@@ -196,7 +196,48 @@
       .card{box-shadow:none;border:0}
       .review-card,.written-card{break-inside:avoid}
     }
-  </style>
+  
+.mobile-bank-nav{
+  display:none;
+}
+@media(max-width:760px), (display-mode:standalone){
+  body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .mobile-bank-nav{
+    position:fixed;
+    z-index:1000;
+    left:0;
+    right:0;
+    bottom:0;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:9px;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(255,255,255,.98);
+    border-top:1px solid var(--line);
+    box-shadow:0 -8px 24px rgba(16,24,40,.12);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+  }
+  .mobile-bank-button{
+    min-height:46px;
+    border-radius:11px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:#344054;
+    font-weight:850;
+    font-size:15px;
+  }
+  .mobile-bank-button:first-child{
+    border-color:var(--brand);
+    background:var(--brand);
+    color:#fff;
+  }
+}
+@media print{
+  .mobile-bank-nav{display:none!important}
+}
+
+</style>
 </head>
 <body>
 <div class="app-shell">
@@ -525,7 +566,7 @@ function bindEvents(){
   $('smartRotationToggle').addEventListener('change',updateRotationStatus); $('resetRotationBtn').addEventListener('click',resetCurrentRotation); $('resetLearningBtn').addEventListener('click',resetLearningData);
   $('timerToggle').addEventListener('change',()=> $('minutesField').classList.toggle('hidden',!$('timerToggle').checked));
   $('startBtn').addEventListener('click',startFromForm); $('resumeBtn').addEventListener('click',resumeSaved);
-  $('banksBtn').addEventListener('click',goToSuite); $('homeBtn').addEventListener('click',goHome); $('prevBtn').addEventListener('click',()=>moveQuestion(-1)); $('nextBtn').addEventListener('click',()=>moveQuestion(1));
+  $('banksBtn').addEventListener('click',goToSuite); $('homeBtn').addEventListener('click',goHome); document.querySelectorAll('.mobileBanksBtn').forEach(button=>button.addEventListener('click',goToSuite)); document.querySelectorAll('.mobileHomeBtn').forEach(button=>button.addEventListener('click',goHome)); $('prevBtn').addEventListener('click',()=>moveQuestion(-1)); $('nextBtn').addEventListener('click',()=>moveQuestion(1));
   $('flagBtn').addEventListener('click',toggleFlag); $('saveExitBtn').addEventListener('click',()=>{saveSession();stopTimer();showScreen('homeScreen');updateRotationStatus()});
   $('submitBtn').addEventListener('click',()=>submitSession(false)); $('navToggle').addEventListener('click',()=> $('sideCard').classList.toggle('collapsed'));
   $('reviewIncorrectBtn').addEventListener('click',()=>renderReview('incorrect')); $('reviewAllBtn').addEventListener('click',()=>renderReview('all'));
@@ -607,5 +648,11 @@ function openWritten(){const set=getSet($('setSelect').value);showScreen('writte
 function clearWritten(){if(!confirm('Clear all written responses for this question bank?'))return;document.querySelectorAll('#writtenList textarea[data-key]').forEach(t=>{store.removeItem(t.dataset.key);t.value=''})}
 init();
 </script>
+
+<nav class="mobile-bank-nav no-print" aria-label="Practice suite navigation">
+  <button type="button" class="mobile-bank-button mobileBanksBtn">Banks</button>
+  <button type="button" class="mobile-bank-button mobileHomeBtn">Current bank home</button>
+</nav>
+
 </body>
 </html>

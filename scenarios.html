@@ -193,7 +193,48 @@
       .card{box-shadow:none;border:0}
       .review-card{break-inside:avoid}
     }
-  </style>
+  
+.mobile-bank-nav{
+  display:none;
+}
+@media(max-width:760px), (display-mode:standalone){
+  body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .mobile-bank-nav{
+    position:fixed;
+    z-index:1000;
+    left:0;
+    right:0;
+    bottom:0;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:9px;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(255,255,255,.98);
+    border-top:1px solid var(--line);
+    box-shadow:0 -8px 24px rgba(16,24,40,.12);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+  }
+  .mobile-bank-button{
+    min-height:46px;
+    border-radius:11px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:#344054;
+    font-weight:850;
+    font-size:15px;
+  }
+  .mobile-bank-button:first-child{
+    border-color:var(--brand);
+    background:var(--brand);
+    color:#fff;
+  }
+}
+@media print{
+  .mobile-bank-nav{display:none!important}
+}
+
+</style>
 </head>
 <body>
 <header class="topbar">
@@ -430,9 +471,15 @@ function saveActive(){if(state&&!state.finished)localStorage.setItem(STORAGE_ACT
 function updateHeader(){$("headerStatus").textContent=state?`Scenario ${state.current+1}/${state.scenarios.length}`:"Set 4 scenario bank • smart rotation"}
 function goToSuite(){if(state&&!state.finished&&!confirm("Return to the test bank selector? Your current scenario session will remain saved and can be resumed later."))return;if(state&&!state.finished)saveActive();clearInterval(timerId);window.location.href="./index.html"}
 function goHome(){if(state&&!state.finished&&!confirm("Leave this session? Your current progress will remain saved in this browser."))return;clearInterval(timerId);showScreen("homeScreen");renderHistory();$("headerStatus").textContent="Set 4 scenario bank • smart rotation";updateCaseRotationStatus()}
-function wire(){setSegment("orderSeg","order");setSegment("modeSeg","mode");buildScope();renderHistory();$("smartRotation").addEventListener("change",updateCaseRotationStatus);$("resetCaseRotation").addEventListener("click",resetCaseRotation);$("resetCaseLearning").addEventListener("click",resetCaseLearning);$("startBtn").addEventListener("click",()=>startSession());$("clearHistoryBtn").addEventListener("click",()=>{if(confirm("Clear saved result history?")){localStorage.removeItem(STORAGE_HISTORY);renderHistory()}});$("banksBtn").addEventListener("click",goToSuite);$("homeBtn").addEventListener("click",goHome);$("prevBtn").addEventListener("click",()=>go(-1));$("nextBtn").addEventListener("click",()=>go(1));$("flagBtn").addEventListener("click",toggleFlag);$("collapseScenarioBtn").addEventListener("click",toggleScenario);$("submitScenarioBtn").addEventListener("click",checkScenario);$("finishBtn").addEventListener("click",()=>finishSession(false));$("mobileNavToggle").addEventListener("click",()=>$("sideCard").classList.toggle("collapsed"));$("reviewMissedBtn").addEventListener("click",()=>renderReview(true));$("retakeMissedBtn").addEventListener("click",retakeMissed);$("printBtn").addEventListener("click",()=>window.print());$("newSessionBtn").addEventListener("click",()=>{state=null;showScreen("homeScreen");renderHistory();updateCaseRotationStatus()});document.addEventListener("keydown",e=>{if($("sessionScreen").classList.contains("hidden")||!state)return;if(["1","2","3"].includes(e.key))selectAnswer(focusedQuestion,Number(e.key)-1);else if(e.key.toLowerCase()==="f")toggleFlag()});const active=localStorage.getItem(STORAGE_ACTIVE);if(active){try{const saved=JSON.parse(active);if(saved&&!saved.finished&&saved.scenarios?.length&&confirm("Resume your saved case-study session?")){state=saved;remaining=state.duration;showScreen("sessionScreen");startTimer();renderScenario()}}catch{}}updateCaseRotationStatus()}
+function wire(){setSegment("orderSeg","order");setSegment("modeSeg","mode");buildScope();renderHistory();$("smartRotation").addEventListener("change",updateCaseRotationStatus);$("resetCaseRotation").addEventListener("click",resetCaseRotation);$("resetCaseLearning").addEventListener("click",resetCaseLearning);$("startBtn").addEventListener("click",()=>startSession());$("clearHistoryBtn").addEventListener("click",()=>{if(confirm("Clear saved result history?")){localStorage.removeItem(STORAGE_HISTORY);renderHistory()}});$("banksBtn").addEventListener("click",goToSuite);$("homeBtn").addEventListener("click",goHome);document.querySelectorAll(".mobileBanksBtn").forEach(button=>button.addEventListener("click",goToSuite));document.querySelectorAll(".mobileHomeBtn").forEach(button=>button.addEventListener("click",goHome));$("prevBtn").addEventListener("click",()=>go(-1));$("nextBtn").addEventListener("click",()=>go(1));$("flagBtn").addEventListener("click",toggleFlag);$("collapseScenarioBtn").addEventListener("click",toggleScenario);$("submitScenarioBtn").addEventListener("click",checkScenario);$("finishBtn").addEventListener("click",()=>finishSession(false));$("mobileNavToggle").addEventListener("click",()=>$("sideCard").classList.toggle("collapsed"));$("reviewMissedBtn").addEventListener("click",()=>renderReview(true));$("retakeMissedBtn").addEventListener("click",retakeMissed);$("printBtn").addEventListener("click",()=>window.print());$("newSessionBtn").addEventListener("click",()=>{state=null;showScreen("homeScreen");renderHistory();updateCaseRotationStatus()});document.addEventListener("keydown",e=>{if($("sessionScreen").classList.contains("hidden")||!state)return;if(["1","2","3"].includes(e.key))selectAnswer(focusedQuestion,Number(e.key)-1);else if(e.key.toLowerCase()==="f")toggleFlag()});const active=localStorage.getItem(STORAGE_ACTIVE);if(active){try{const saved=JSON.parse(active);if(saved&&!saved.finished&&saved.scenarios?.length&&confirm("Resume your saved case-study session?")){state=saved;remaining=state.duration;showScreen("sessionScreen");startTimer();renderScenario()}}catch{}}updateCaseRotationStatus()}
 wire();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
 </script>
+
+<nav class="mobile-bank-nav no-print" aria-label="Practice suite navigation">
+  <button type="button" class="mobile-bank-button mobileBanksBtn">Banks</button>
+  <button type="button" class="mobile-bank-button mobileHomeBtn">Current bank home</button>
+</nav>
+
 </body>
 </html>
